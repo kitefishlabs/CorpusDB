@@ -56,7 +56,7 @@ CorpusDB Modules
    :maxdepth: 2
 
    corpusdb - database of sound files and metadata <corpusdb>
-   corpussoundfiletree - representation of sounds and processed versions as nodes in tree <corpussoundfiletree>
+   <sftree - representation of sounds and processed versions as nodes in tree <sftree>
    nrtoscparser - convert synth parameters into non-realtime (NRT) synthesis .osc files <nrtoscparser>
 
 Indices and tables

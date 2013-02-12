@@ -20,7 +20,7 @@ __email__ = 'tms@kitefishlabs.com'
 import os, sys, time, wave, contextlib
 
 
-class CorpusSoundFileTree:
+class SFTree:
 
 	def __init__(self, crps, path):
 		self.corpus = crps
