@@ -20,7 +20,7 @@ __email__ = 'tms@kitefishlabs.com'
 import os, sys, string, math, resource
 import shlex, subprocess, jsonpickle, json
 import numpy as np
-import nrtoscparser, corpussoundfiletree
+import nrtoscparser, sftree
 
 class CorpusDB:
 	"""
