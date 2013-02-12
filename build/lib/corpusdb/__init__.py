@@ -22,5 +22,3 @@ Supercollider + Python + Corpus-based Processing.
 """
 
 from corpusdb import *
-# from sftree import *
-# from nrtoscparser import *
