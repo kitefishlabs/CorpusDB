@@ -1,0 +1,953 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>corpusdb.corpusdb &mdash; CorpusDB 1.0 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/agogo.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="CorpusDB 1.0 documentation" href="../../index.html" />
+    <link rel="up" title="corpusdb" href="../corpusdb.html" /> 
+  </head>
+  <body>
+    <div class="header-wrapper">
+      <div class="header">
+        <div class="headertitle"><a
+          href="../../index.html">CorpusDB 1.0 documentation</a></div>
+        <div class="rel">
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a>
+        </div>
+       </div>
+    </div>
+
+    <div class="content-wrapper">
+      <div class="content">
+        <div class="document">
+            
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for corpusdb.corpusdb</h1><div class="highlight"><pre>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">sys</span><span class="o">,</span> <span class="nn">time</span><span class="o">,</span> <span class="nn">sc</span><span class="o">,</span> <span class="nn">wave</span><span class="o">,</span> <span class="nn">string</span><span class="o">,</span> <span class="nn">math</span><span class="o">,</span> <span class="nn">resource</span>
+<span class="kn">import</span> <span class="nn">shlex</span><span class="o">,</span> <span class="nn">subprocess</span><span class="o">,</span> <span class="nn">signal</span><span class="o">,</span> <span class="nn">contextlib</span><span class="o">,</span> <span class="nn">jsonpickle</span><span class="o">,</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">NRTOSCParser</span>
+
+<span class="k">class</span> <span class="nc">CorpusDB</span><span class="p">:</span>
+
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">sudo_flag</span><span class="o">=</span><span class="s">&#39;False&#39;</span><span class="p">):</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">anchor</span> <span class="o">=</span> <span class="n">name</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">rate</span> <span class="o">=</span> <span class="mi">44100</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">HOP_SECS</span> <span class="o">=</span> <span class="mf">0.04</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">HOP_MS</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">HOP_SECS</span> <span class="o">*</span> <span class="mi">1000</span>
+		
+		<span class="bp">self</span><span class="o">.</span><span class="n">reset_corpus</span><span class="p">()</span>
+				
+		<span class="bp">self</span><span class="o">.</span><span class="n">parser</span> <span class="o">=</span> <span class="n">NRTOSCParser</span><span class="o">.</span><span class="n">NRTOSCParser</span><span class="p">()</span>
+			
+		<span class="bp">self</span><span class="o">.</span><span class="n">sound_file_units_mapped</span> <span class="o">=</span> <span class="bp">False</span>
+		
+		<span class="k">if</span> <span class="n">sudo_flag</span> <span class="ow">is</span> <span class="bp">True</span><span class="p">:</span> <span class="n">resource</span><span class="o">.</span><span class="n">setrlimit</span><span class="p">(</span><span class="n">resource</span><span class="o">.</span><span class="n">RLIMIT_NOFILE</span><span class="p">,</span> <span class="p">(</span><span class="mi">16384</span><span class="p">,</span> <span class="mi">16384</span><span class="p">))</span> <span class="c">#!!!</span>
+		<span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">anchor</span><span class="p">)</span> <span class="c"># just in case we created this corpus using a link...</span>
+	
+	<span class="k">def</span> <span class="nf">reset_corpus</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+	
+		<span class="bp">self</span><span class="o">.</span><span class="n">sftree</span> <span class="o">=</span> <span class="n">CorpusSoundFileTree</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">anchor</span><span class="p">)</span>
+<span class="c"># 		self.segtable = dict() # segtable&#39;s role is now part of the sftree nodes!</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">cutable</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="c"># data structures for raw data and corpus data</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">rawtable</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">rawmaps</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">powers</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">mfccs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">activation_layers</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">cooked_layers</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="c"># corpus-level mappings and helper data structures</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">sfmap</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">sfgmap</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">tagmap</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">transformations</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">({</span><span class="mi">0</span><span class="p">:</span> <span class="s">&#39;thru&#39;</span><span class="p">,</span> <span class="s">&#39;thru&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">synthdefs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="c"># information about the corpus&#39;s current state</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">sf_offset</span> <span class="o">=</span> <span class="mi">0</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">cu_offset</span> <span class="o">=</span> <span class="mi">0</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">sfg_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span> <span class="c"># to-do: make this work: the set has to be valid after every change to cutable &amp; segtable</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">dtable</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">({</span><span class="mi">0</span><span class="p">:</span> <span class="s">&#39;unitID&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span> <span class="s">&#39;sfRelID&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="s">&#39;sfileID&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">:</span> <span class="s">&#39;sfGrpID&#39;</span><span class="p">,</span>
+			<span class="mi">4</span><span class="p">:</span> <span class="s">&#39;onset&#39;</span><span class="p">,</span> <span class="mi">5</span><span class="p">:</span> <span class="s">&#39;duration&#39;</span><span class="p">,</span> <span class="mi">6</span><span class="p">:</span> <span class="s">&#39;tRatio&#39;</span><span class="p">,</span> <span class="mi">7</span><span class="p">:</span> <span class="s">&#39;uTag&#39;</span><span class="p">})</span>
+	
+	<span class="k">def</span> <span class="nf">add_sound_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">sfid</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">srcFileID</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">tratio</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">sfGrpID</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">synthdef</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">subdir</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">reuseFlag</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">importFlag</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">uflag</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Add a sound file to the corpus. Wither a filename or an sfid must be provided.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="c"># check for duplicate entries having same sndfile and tratio ???</span>
+		<span class="c">#print &#39;srcfile?: &#39;, srcFileID</span>
+		<span class="c">#print &#39;path?: &#39;, filename</span>
+		<span class="c">#print &#39;sfid?: &#39;, sfid</span>
+
+		<span class="k">if</span> <span class="n">sfid</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+			<span class="c">#NEED A MUCH BETTER ALGORITHM HERE! search for lowest unused sfid!</span>
+			<span class="n">sfid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sf_offset</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">sf_offset</span> <span class="o">=</span> <span class="n">sfid</span> <span class="o">+</span> <span class="mi">1</span>
+
+		<span class="k">if</span> <span class="n">srcFileID</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+
+			<span class="c">#pth, grp, tratio</span>
+			<span class="n">root_node</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">add_root_node</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="n">tratio</span><span class="p">,</span> <span class="n">sfGrpID</span><span class="p">,</span> <span class="n">snd_subdir</span><span class="o">=</span><span class="n">subdir</span><span class="p">,</span> <span class="n">uniqueFlag</span><span class="o">=</span><span class="n">uflag</span><span class="p">)</span>
+			<span class="k">print</span> <span class="s">&quot;add_root_node res: &quot;</span><span class="p">,</span> <span class="n">root_node</span><span class="o">.</span><span class="n">sfpath</span><span class="p">,</span> <span class="s">&#39;, &#39;</span><span class="p">,</span> <span class="n">root_node</span><span class="o">.</span><span class="n">sfid</span><span class="p">,</span> <span class="s">&#39;, &#39;</span><span class="p">,</span> <span class="n">root_node</span><span class="o">.</span><span class="n">group</span><span class="p">,</span> <span class="s">&#39;, &#39;</span><span class="p">,</span> <span class="n">root_node</span><span class="o">.</span><span class="n">tratio</span>
+			
+<span class="c"># 			print &quot;reuse flag: &quot;, reuseFlag</span>
+<span class="c"># 			if reuseFlag:</span>
+<span class="c"># 				fname = string.split(os.path.basename( os.path.abspath(root_node.sfpath) ), &#39;.&#39;)</span>
+<span class="c"># 				cwd = os.path.dirname( os.path.abspath(root_node.sfpath) )</span>
+<span class="c"># 				mdpath = cwd + &quot;/md/&quot; + fname[0] + &#39;_&#39; + `root_node.tratio` + &#39;.md.&#39; + fname[1]</span>
+<span class="c"># 				print &#39;MDPATH for REUSE: &#39;, mdpath</span>
+<span class="c"># 				num_frames = math.ceil(self.sftree.nodes[sfid].duration / self.HOP_SECS / root_node.tratio)</span>
+<span class="c"># 				#print &#39;num_frames for REUSE: &#39;, num_frames</span>
+<span class="c"># 				self.map_raw_sound_file(mdpath, sfid, num_frames)</span>
+			<span class="k">return</span> <span class="n">root_node</span>
+			
+			<span class="c"># print &quot;import flag: &quot;, importFlag, </span>
+			<span class="k">if</span> <span class="n">importFlag</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">import_sound_file_to_buffer</span><span class="p">(</span><span class="n">root_node</span><span class="o">.</span><span class="n">sfpath</span><span class="p">,</span> <span class="n">sfid</span><span class="p">)</span>
+		
+		<span class="k">else</span><span class="p">:</span>
+			<span class="c">#print &#39;ADD CHILD: &#39;, srcFileID, &#39; | &#39;, sfid, &#39; | &#39;, tratio, &#39; | &#39;, sfGrpID, &#39; | &#39;, synthdef, &#39; | &#39;, params</span>
+			<span class="c"># sfid, grp, tratio</span>
+			<span class="n">child_node</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">add_child_node</span><span class="p">(</span><span class="n">srcFileID</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="n">tratio</span><span class="p">,</span> <span class="n">sfGrpID</span><span class="p">,</span> <span class="n">synthdef</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">uniqueFlag</span><span class="o">=</span><span class="n">uflag</span><span class="p">)</span>
+			<span class="k">print</span> <span class="s">&quot;add_child_node res: &quot;</span><span class="p">,</span> <span class="n">child_node</span><span class="o">.</span><span class="n">parent_id</span><span class="p">,</span> <span class="s">&#39;, &#39;</span><span class="p">,</span> <span class="n">child_node</span><span class="o">.</span><span class="n">sfid</span><span class="p">,</span> <span class="s">&#39;, &#39;</span><span class="p">,</span> <span class="n">child_node</span><span class="o">.</span><span class="n">group</span><span class="p">,</span> <span class="s">&#39;, &#39;</span><span class="p">,</span> <span class="n">child_node</span><span class="o">.</span><span class="n">tratio</span>
+			<span class="k">return</span> <span class="n">child_node</span>
+		
+
+	<span class="k">def</span> <span class="nf">remove_sound_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">pass</span>
+	
+	<span class="k">def</span> <span class="nf">importSoundFileToBuffer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">sfid</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">pass</span>
+	
+	<span class="k">def</span> <span class="nf">map_raw_sound_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="n">frames</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Replaces mapBySFRelID.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">rawtable</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">frames</span><span class="p">)</span>
+	
+	<span class="k">def</span> <span class="nf">_activate_raw_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sfid</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Returns memmap associated with this sfid, None if memmap cannot be found.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">try</span><span class="p">:</span> 
+			<span class="n">pair</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rawtable</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span>
+		<span class="k">except</span> <span class="ne">KeyError</span><span class="p">(</span><span class="n">key</span><span class="p">):</span>
+			<span class="k">print</span> <span class="s">&quot;Error, this key (&quot;</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="s">&quot;)does not have raw metadata associated with it.</span><span class="se">\n</span><span class="s">Cannot activate.&quot;</span>
+			<span class="k">return</span> <span class="bp">None</span>
+		<span class="n">mdpath</span> <span class="o">=</span> <span class="n">pair</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+		<span class="k">print</span> <span class="s">&#39;mdpath: &#39;</span><span class="p">,</span> <span class="n">mdpath</span>
+		<span class="n">num_frames</span> <span class="o">=</span> <span class="n">pair</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+		<span class="k">try</span><span class="p">:</span>
+			<span class="n">power_vector</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rawmaps</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">T</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+			<span class="n">mfccs_vector</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rawmaps</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">T</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span><span class="o">.</span><span class="n">T</span>
+		<span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+			<span class="c">#print &quot;key errors are good...&quot;</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">rawmaps</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">memmap</span><span class="p">(</span><span class="n">mdpath</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">&#39;r&#39;</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">272</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">num_frames</span><span class="p">,</span> <span class="mi">25</span><span class="p">))</span> <span class="c">#280?</span>
+			<span class="n">power_vector</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rawmaps</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">T</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+			<span class="n">mfccs_vector</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rawmaps</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">T</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span><span class="o">.</span><span class="n">T</span>
+		
+		<span class="n">interm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">masked_outside</span><span class="p">(</span><span class="n">mfccs_vector</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+		<span class="n">interm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">masked_invalid</span><span class="p">(</span><span class="n">interm</span><span class="p">)</span>
+		<span class="n">interm</span> <span class="o">=</span> <span class="n">interm</span><span class="o">.</span><span class="n">filled</span><span class="p">(</span><span class="n">interm</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+		
+		<span class="bp">self</span><span class="o">.</span><span class="n">activation_layers</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.0</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">interm</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])]</span> <span class="c"># num rows in memmap</span>
+		
+		<span class="bp">self</span><span class="o">.</span><span class="n">cooked_layers</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">row</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">interm</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">activation_layers</span><span class="p">[</span><span class="n">sfid</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mf">0.5</span><span class="p">]</span>
+		
+		<span class="bp">self</span><span class="o">.</span><span class="n">powers</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span> <span class="o">=</span> <span class="n">power_vector</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">mfccs</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span> <span class="o">=</span> <span class="n">mfccs_vector</span>
+		
+		<span class="k">del</span> <span class="n">interm</span>
+		
+		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">powers</span><span class="p">[</span><span class="n">sfid</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">mfccs</span><span class="p">[</span><span class="n">sfid</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">activation_layers</span><span class="p">[</span><span class="n">sfid</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">cooked_layers</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span>
+    
+	<span class="k">def</span> <span class="nf">_deactivate_raw_sound_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sfid</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">try</span><span class="p">:</span>
+			<span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">rawmaps</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span>
+		<span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&quot;Attempt to deactivate memmap for key &quot;</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="s">&quot; has failed.&quot;</span>
+			<span class="k">return</span> <span class="bp">None</span>
+		<span class="k">return</span> <span class="n">sfid</span>
+		
+	<span class="k">def</span> <span class="nf">analyze_sound_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">tratio</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">subdir</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Read NRT OSC score file, perform analysis asynchronously via shell, wait, signal completion and clean up.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">print</span> <span class="s">&#39;file name: &#39;</span><span class="p">,</span> <span class="n">filename</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">parser</span><span class="o">.</span><span class="n">anchor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">anchor</span>
+
+		<span class="k">if</span> <span class="n">subdir</span><span class="p">:</span>
+			<span class="n">fullpath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">anchor</span><span class="p">,</span> <span class="s">&#39;snd&#39;</span><span class="p">,</span> <span class="n">subdir</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="n">fullpath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">anchor</span><span class="p">,</span> <span class="s">&#39;snd&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+
+		<span class="c"># fullpath = os.path.join(self.anchor, &#39;snd&#39;, filename)</span>
+		<span class="n">oscpath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">anchor</span><span class="p">,</span> <span class="s">&#39;osc&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">filename</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s">&#39;_&#39;</span> <span class="o">+</span> <span class="sb">`tratio`</span> <span class="o">+</span> <span class="s">&#39;_power_mfcc24Analyzer.osc&#39;</span><span class="p">))</span>
+		<span class="k">print</span> <span class="s">&#39;create nrt score args: &#39;</span><span class="p">,</span> <span class="n">fullpath</span><span class="p">,</span> <span class="s">&#39; &#39;</span><span class="p">,</span> <span class="n">oscpath</span>
+		<span class="c">#print sfid, &#39; &#39;	, tratio, &#39; &#39;, self.rate, &#39; &#39;, self.sftree.nodes[sfid].duration, &#39; &#39;, oscpath</span>
+		
+		<span class="k">try</span><span class="p">:</span>
+			<span class="n">synthid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">parent_id</span>
+<span class="c"># 			print &quot;=== &quot;, synthid</span>
+			<span class="n">efx_synth</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">trackbacks</span><span class="p">[</span><span class="n">sfid</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+			<span class="n">efx_params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">trackbacks</span><span class="p">[</span><span class="n">sfid</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+		<span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+			<span class="n">synthid</span> <span class="o">=</span> <span class="n">sfid</span>
+			<span class="n">efx_synth</span> <span class="o">=</span> <span class="bp">None</span>
+			<span class="n">efx_params</span> <span class="o">=</span> <span class="bp">None</span>
+		<span class="c"># print &quot;### &quot;, synthid, &#39;\n&#39;, self.sftree.trackbacks[sfid][0], &#39;\n&#39;, self.sftree.trackbacks[sfid][1]</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">parser</span><span class="o">.</span><span class="n">createNRTScore</span><span class="p">(</span><span class="n">fullpath</span><span class="p">,</span> 
+									<span class="n">sfid</span><span class="o">=</span><span class="n">sfid</span><span class="p">,</span> 
+									<span class="n">tratio</span><span class="o">=</span><span class="n">tratio</span><span class="p">,</span> 
+									<span class="n">srate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">rate</span><span class="p">,</span> 
+									<span class="n">duration</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">duration</span><span class="p">,</span> 
+									<span class="n">oscDir</span><span class="o">=</span><span class="n">oscpath</span><span class="p">,</span> 
+									<span class="n">synthdef</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">synthid</span><span class="p">]</span><span class="o">.</span><span class="n">synth</span><span class="p">,</span> 
+									<span class="n">efxSynthdefs</span><span class="o">=</span><span class="n">efx_synth</span><span class="p">,</span> 
+									<span class="n">params</span><span class="o">=</span><span class="n">efx_params</span><span class="p">)</span>
+
+		<span class="n">cmd</span> <span class="o">=</span> <span class="s">&#39;scsynth -N &#39;</span> <span class="o">+</span> <span class="n">oscpath</span> <span class="o">+</span> <span class="s">&#39; _ _ 44100 WAVE float32 -o 1&#39;</span>
+		<span class="n">args</span> <span class="o">=</span> <span class="n">shlex</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">cmd</span><span class="p">)</span>
+		<span class="n">p</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span> <span class="c">#, shell=True, close_fds=True)</span>
+		
+		<span class="k">print</span> <span class="s">&#39;PID: &#39;</span><span class="p">,</span> <span class="n">p</span><span class="o">.</span><span class="n">pid</span>
+		<span class="n">rc</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+				
+		<span class="k">print</span> <span class="s">&#39;RC: &#39;</span><span class="p">,</span> <span class="n">rc</span>
+		<span class="k">if</span> <span class="n">rc</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+			<span class="n">cwd</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">fullpath</span><span class="p">)</span>
+			<span class="n">fname</span> <span class="o">=</span> <span class="n">string</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">fullpath</span><span class="p">),</span> <span class="s">&#39;.&#39;</span><span class="p">)</span>
+			<span class="n">cwd</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">cwd</span><span class="p">)</span>
+			<span class="n">mdpath</span> <span class="o">=</span> <span class="n">cwd</span> <span class="o">+</span> <span class="s">&quot;/md/&quot;</span> <span class="o">+</span> <span class="n">fname</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s">&#39;_&#39;</span> <span class="o">+</span> <span class="sb">`tratio`</span> <span class="o">+</span> <span class="s">&#39;.md.&#39;</span> <span class="o">+</span> <span class="n">fname</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+			<span class="c">#print &#39;MDPATH for mapping: &#39;, mdpath</span>
+			<span class="n">num_frames</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">duration</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">HOP_SECS</span> <span class="o">/</span> <span class="n">tratio</span><span class="p">))</span>
+			<span class="c">#print &#39;num frames: &#39;, num_frames</span>
+			<span class="c"># map it:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">map_raw_sound_file</span><span class="p">(</span><span class="n">mdpath</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="n">num_frames</span><span class="p">)</span>
+			<span class="c">## sftrees/trackbacks: handled in add_sound_file()!</span>
+			<span class="c">## what to do if returncode != 1 ???</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;Analysis was not successful; failed to map raw sound file!!!&#39;</span>
+		
+<span class="c"># 		os.killpg(p.pid, signal.SIGTERM)</span>
+<span class="c"># 		del p</span>
+	
+	<span class="k">def</span> <span class="nf">map_id_to_sf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">sfid</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">sfgroup</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Map an integer index to a sound file path. Also adds mapping from the group id -&gt;.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">if</span> <span class="n">sfid</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+			<span class="nb">id</span> <span class="o">=</span> <span class="n">sfid</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">sf_offset</span> <span class="o">+=</span> <span class="mi">1</span>
+			<span class="nb">id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sf_offset</span>
+		<span class="c">#print &quot;sfgmap val: &quot;, self.sfgmap[sfgroup]</span>
+		<span class="k">try</span><span class="p">:</span>
+			<span class="c">#self.sfgmap[sfgroup]</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">sfgmap</span><span class="p">[</span><span class="n">sfgroup</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+		<span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">sfgmap</span><span class="p">[</span><span class="n">sfgroup</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="nb">id</span><span class="p">])</span>
+		<span class="k">try</span><span class="p">:</span> <span class="c"># (self.sfmap[sfid] is not None) and (self.sfmap[path] is not None):</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">sfmap</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span> <span class="o">=</span> <span class="n">path</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">sfmap</span><span class="p">[</span><span class="n">path</span><span class="p">]</span> <span class="o">=</span> <span class="n">sfid</span>
+		<span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;This sfid &lt;-&gt; path mapping has already been made.&#39;</span>
+			<span class="k">return</span> <span class="bp">None</span>
+	
+	
+	<span class="k">def</span> <span class="nf">add_sound_file_unit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">onset</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">dur</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">tag</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		In add_sound_file_unit, sfg arg is not used...</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">if</span> <span class="n">sfid</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+			<span class="n">sfid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lookup_sfid</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_snd_path</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
+		<span class="k">print</span> <span class="s">&#39;SFID: &#39;</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="s">&#39; | onset: &#39;</span><span class="p">,</span> <span class="n">onset</span><span class="p">,</span> <span class="s">&#39; | dur: &#39;</span><span class="p">,</span> <span class="n">dur</span>
+		<span class="k">try</span><span class="p">:</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">add_onset_and_dur_pair</span><span class="p">(</span><span class="n">onset</span><span class="p">,</span> <span class="n">dur</span><span class="p">)</span>
+			<span class="k">print</span> <span class="s">&#39;$$$$$$$$$$$$$ TAG: &#39;</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="s">&#39; LEN: &#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">update_unit_segment_params</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">tag</span><span class="o">=</span><span class="n">tag</span><span class="p">)</span>
+			<span class="k">print</span> <span class="s">&#39;#---&gt; &#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">)</span>
+		<span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;Error: there is no Node for &#39;</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="s">&#39; in the sf tree. Add SFU failed&#39;</span>
+			<span class="k">return</span> <span class="bp">None</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">sound_file_units_mapped</span> <span class="o">=</span> <span class="bp">False</span>
+		<span class="k">return</span> <span class="n">sfid</span>
+	
+	<span class="k">def</span> <span class="nf">_get_snd_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fname</span><span class="p">):</span>
+		<span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">anchor</span> <span class="o">+</span> <span class="s">&#39;/snd/&#39;</span> <span class="o">+</span> <span class="n">fname</span><span class="p">)</span>
+	
+	<span class="k">def</span> <span class="nf">update_sound_file_unit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">relid</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">onset</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">dur</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">tag</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Change the relid, bounds, or group.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">if</span> <span class="n">sfid</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+			<span class="n">sfid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lookup_sfid</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_snd_path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>	<span class="p">)</span>
+		<span class="k">if</span> <span class="n">relid</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+			<span class="k">try</span><span class="p">:</span>
+				<span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">update_unit_segment_params</span><span class="p">(</span><span class="n">relid</span><span class="p">,</span> <span class="n">onset</span><span class="p">,</span> <span class="n">dur</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span>
+				<span class="k">return</span> <span class="n">sfid</span><span class="p">,</span> <span class="n">relid</span>
+			<span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+				<span class="s">&#39;Error: there is no entry for &#39;</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="s">&#39; in the sf map. Update SFU failed.&#39;</span>
+				<span class="k">return</span> <span class="bp">None</span>
+			<span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+				<span class="s">&#39;Error: &#39;</span><span class="p">,</span> <span class="n">relid</span><span class="p">,</span> <span class="s">&#39; is a bad relid for sfid &#39;</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="s">&#39;.&#39;</span>
+				<span class="k">return</span> <span class="bp">None</span>
+	
+	<span class="k">def</span> <span class="nf">remove_sound_file_unit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">relid</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Remove all internal mappings for a given sfid/path.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+			<span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span>		
+	
+	<span class="k">def</span> <span class="nf">clear_sound_file_units</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Remove all references to all sound file units.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		
+		<span class="k">if</span> <span class="n">sfid</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+			<span class="n">sfid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lookup_sfid</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+		<span class="k">try</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">unit_segments</span> <span class="o">=</span> <span class="p">[]</span>
+			<span class="c">#self.segtable[sfid][&#39;umd&#39;] = []</span>
+		<span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+			<span class="s">&#39;Error: there is no entry for &#39;</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="s">&#39; in the sf map. Update SFU failed.&#39;</span>
+			<span class="k">return</span> <span class="bp">None</span>
+		<span class="k">return</span> <span class="n">sfid</span>
+		
+	<span class="k">def</span> <span class="nf">get_raw_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sfid</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Return scalars, vectors, activation layer, and cooked layer in that order. Calls _activate_raw_metadata, if necessary.</span>
+<span class="sd">		Note that this function is only going to work when there is raw analyzed metadata. To get the segmentsed</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">try</span><span class="p">:</span>
+			<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">powers</span><span class="p">[</span><span class="n">sfid</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">mfccs</span><span class="p">[</span><span class="n">sfid</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">activation_layers</span><span class="p">[</span><span class="n">sfid</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">cooked_layers</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span>
+		<span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+			<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_activate_raw_metadata</span><span class="p">(</span><span class="n">sfid</span><span class="p">)</span> <span class="c"># now self.rawmaps[sfid] should exist or res == None if not</span>
+	
+	<span class="k">def</span> <span class="nf">get_sorted_units_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sfid</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">sort_segments_list</span><span class="p">()</span>
+	
+	<span class="k">def</span> <span class="nf">segment_units</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sfid</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		This function takes the list of unit breakpoints, plus the raw metadata, and assembles &#39;cooked&#39; segments in the corpus segtable.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="n">segmented</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_sorted_units_list</span><span class="p">(</span><span class="n">sfid</span><span class="p">)</span>
+		<span class="k">print</span> <span class="s">&#39;#---&gt; &#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">segmented</span><span class="p">)</span>
+		<span class="n">raw_amps</span><span class="p">,</span> <span class="n">raw_mfccs</span><span class="p">,</span> <span class="n">activation</span><span class="p">,</span> <span class="n">cooked</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_activate_raw_metadata</span><span class="p">(</span><span class="n">sfid</span><span class="p">)</span>
+		<span class="n">amps</span> <span class="p">,</span> <span class="n">reheated</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[]</span>
+		
+<span class="c"># 		print &#39;raw: &#39;, raw_amps</span>
+		<span class="n">amps_stripped</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">raw_amps</span><span class="p">)</span>
+<span class="c"># 		print &#39;amps_stripped: &#39;, amps_stripped</span>
+		<span class="n">mfccs_stripped</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">raw_mfccs</span><span class="p">)</span>
+		
+		<span class="k">for</span> <span class="n">relid</span><span class="p">,</span> <span class="n">sfu</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">segmented</span><span class="p">):</span>
+
+			<span class="n">offset</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">sfu</span><span class="o">.</span><span class="n">onset</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">HOP_SECS</span><span class="p">))</span>
+			<span class="n">dur</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">sfu</span><span class="o">.</span><span class="n">dur</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">HOP_SECS</span><span class="p">))</span>
+			<span class="k">print</span> <span class="s">&#39;[[&#39;</span><span class="p">,</span> <span class="n">relid</span><span class="p">,</span> <span class="s">&#39;::&#39;</span> <span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="s">&#39;|&#39;</span><span class="p">,</span> <span class="n">dur</span><span class="p">,</span> <span class="s">&#39;]]&#39;</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">add_metadata_for_relid</span><span class="p">(</span><span class="n">relid</span><span class="p">,</span> <span class="n">amps</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">analyze_scalar</span><span class="p">(</span><span class="n">amps_stripped</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">dur</span><span class="p">))</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">add_metadata_for_relid</span><span class="p">(</span><span class="n">relid</span><span class="p">,</span> <span class="n">mfccs</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">mfccs_stripped</span><span class="p">[</span><span class="n">offset</span><span class="p">:(</span><span class="n">offset</span><span class="o">+</span><span class="n">dur</span><span class="p">)],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span>
+		
+	<span class="c"># [MEAN, MAX, LVAL, RVAL, SLOPE]</span>
+	<span class="k">def</span> <span class="nf">analyze_scalar</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">raw_stripped</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">dur</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Helper function that performs statistical analysis on a segment of raw metadata.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="n">chopped</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">raw_stripped</span><span class="p">[</span><span class="n">offset</span><span class="p">:(</span><span class="n">offset</span><span class="o">+</span><span class="n">dur</span><span class="p">)],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+		<span class="n">mean</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">chopped</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+		<span class="nb">max</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">chopped</span><span class="p">)</span>
+		<span class="n">l_val</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">chopped</span><span class="p">[:</span><span class="mi">5</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+		<span class="n">r_val</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">chopped</span><span class="p">[</span><span class="o">-</span><span class="mi">5</span><span class="p">:],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+		<span class="n">slope</span> <span class="o">=</span> <span class="p">(</span><span class="n">r_val</span> <span class="o">-</span> <span class="n">l_val</span><span class="p">)</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">dur</span><span class="p">)</span>
+		<span class="k">return</span> <span class="p">[</span><span class="n">mean</span><span class="p">,</span> <span class="nb">max</span><span class="p">,</span> <span class="n">l_val</span><span class="p">,</span> <span class="n">r_val</span><span class="p">,</span> <span class="n">slope</span><span class="p">]</span>
+
+	<span class="c"># test me</span>
+	<span class="k">def</span> <span class="nf">add_corpus_unit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">uid</span><span class="p">,</span> <span class="n">metadata</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Map a unit id to metadata row in corpus units table.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="c"># some basic metadata checks? check for key collisions?</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">cutable</span><span class="p">[</span><span class="n">uid</span><span class="p">]</span> <span class="o">=</span> <span class="n">metadata</span>
+
+	<span class="c"># test me</span>
+	<span class="k">def</span> <span class="nf">remove_corpus_unit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cid</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Remove a units from the corpus units table.	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">try</span><span class="p">:</span>
+			<span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">cutable</span><span class="p">[</span><span class="n">cid</span><span class="p">]</span>
+		<span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;Error: attempting to remove corpus unit that does not exist at index &#39;</span><span class="p">,</span> <span class="n">cid</span><span class="p">,</span> <span class="s">&#39;.&#39;</span>
+	
+	<span class="c"># test me</span>
+	<span class="k">def</span> <span class="nf">clear_corpus_units</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Remove all units from the corpus units table.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">unit</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cutable</span><span class="p">):</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">cutable</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="bp">None</span>
+	
+	<span class="c"># test me</span>
+	<span class="k">def</span> <span class="nf">_lookup_sfid</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Look up id by querying path in sfmap table.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">try</span><span class="p">:</span>
+			<span class="n">sfid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sfmap</span><span class="p">[</span><span class="n">path</span><span class="p">]</span>
+		<span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;Error: there is no entry for &#39;</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="s">&#39; in the sf map. Update SFU failed.&#39;</span>
+			<span class="k">return</span> <span class="bp">None</span>
+		<span class="k">return</span> <span class="n">sfid</span>
+
+	<span class="c"># test me</span>
+	<span class="k">def</span> <span class="nf">get_sound_file_unit_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sfid</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Get the metadata rows for all units associated with a sound file.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">if</span> <span class="n">sfid</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+			<span class="n">sfid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lookup_sfid</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+		<span class="k">return</span> <span class="nb">sorted</span><span class="p">([</span><span class="n">entry</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cutable</span> <span class="k">if</span> <span class="n">entry</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">sfid</span><span class="p">],</span> <span class="n">key</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">row</span><span class="p">:</span> <span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+	
+	<span class="k">def</span> <span class="nf">map_sound_file_units_to_corpus_units</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Build the corpus unit table from entries found in the sound file unit table.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">print</span> <span class="s">&quot;map sound file units to corpus units&quot;</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">clear_corpus_units</span><span class="p">()</span>
+<span class="c"># 		print &#39;---------------------------------&#39;</span>
+		<span class="k">print</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+		<span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+			<span class="n">sf_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">node</span><span class="p">]</span><span class="o">.</span><span class="n">sfid</span>
+			<span class="n">sf_grp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">node</span><span class="p">]</span><span class="o">.</span><span class="n">group</span>
+			<span class="n">sf_tratio</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">node</span><span class="p">]</span><span class="o">.</span><span class="n">tratio</span>
+<span class="c"># 			print sf_id, &#39;|&#39;, sf_grp, &#39;|&#39;, sf_tratio</span>
+			<span class="n">sf_unit_segments</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">node</span><span class="p">]</span><span class="o">.</span><span class="n">unit_segments</span>
+			<span class="n">relid</span> <span class="o">=</span> <span class="mi">0</span>
+			
+			
+			<span class="k">try</span><span class="p">:</span>
+				<span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">node</span><span class="p">]</span><span class="o">.</span><span class="n">unit_amps</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+					<span class="n">amp_segment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">node</span><span class="p">]</span><span class="o">.</span><span class="n">unit_amps</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+					<span class="n">mfccs_segment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">node</span><span class="p">]</span><span class="o">.</span><span class="n">unit_mfccs</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+					<span class="n">index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cu_offset</span>
+					
+					
+					<span class="c"># GROUP!!!!</span>
+<span class="c"># 					print &#39;@ relid: &#39;, sf_unit_segments[relid].onset</span>
+					<span class="n">row</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">index</span><span class="p">,</span> <span class="n">relid</span><span class="p">,</span> <span class="n">sf_id</span><span class="p">,</span> <span class="n">sf_grp</span><span class="p">,</span> <span class="n">sf_unit_segments</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span><span class="o">.</span><span class="n">onset</span><span class="p">,</span> <span class="n">sf_unit_segments</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span><span class="o">.</span><span class="n">dur</span><span class="p">,</span> <span class="n">sf_tratio</span><span class="p">,</span> <span class="n">sf_unit_segments</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span><span class="o">.</span><span class="n">tag</span><span class="p">])</span>
+<span class="c">#  					print &#39;row: &#39;, row.shape</span>
+<span class="c">#  					print &#39;amp segment: &#39;, amp_segment</span>
+<span class="c">#  					print &#39;mfccs segment: &#39;, mfccs_segment</span>
+					<span class="bp">self</span><span class="o">.</span><span class="n">add_corpus_unit</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">row</span><span class="p">,</span> <span class="n">amp_segment</span><span class="p">,</span> <span class="n">mfccs_segment</span><span class="p">]))</span>
+					<span class="n">relid</span> <span class="o">+=</span> <span class="mi">1</span>
+					<span class="bp">self</span><span class="o">.</span><span class="n">cu_offset</span> <span class="o">+=</span> <span class="mi">1</span>
+			<span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+				<span class="k">print</span> <span class="s">&#39;KeyError on segments traversal, trying to continue&#39;</span>
+				<span class="k">pass</span>
+			<span class="k">except</span><span class="p">:</span>
+				<span class="k">print</span> <span class="s">&quot;Unexpected error:&quot;</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+				<span class="k">raise</span>
+
+
+	<span class="c">####*****</span>
+	<span class="c">#</span>
+	<span class="c"># CORPUS RAW ARRAY ACCESS</span>
+	<span class="c">#</span>
+	
+	<span class="c">#	 index (8)         amp (5)        mfccs (24)	</span>
+	<span class="c">#	[0 1 2 3 4 5 6 7] [8 9 10 11 12] [13 14 15 16 17 ... 36]</span>
+	<span class="c">#</span>
+	
+	<span class="k">def</span> <span class="nf">convert_corpus_to_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s">&#39;all&#39;</span><span class="p">,</span> <span class="n">map_flag</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Convert the corpus unit table to two compacted arrays: power metadata and MFCC metadata.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">if</span> <span class="n">map_flag</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">map_sound_file_units_to_corpus_units</span><span class="p">()</span>
+		<span class="n">num_descriptors</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cutable</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="c"># hard code it?</span>
+
+		<span class="n">xlist</span> <span class="o">=</span> <span class="p">[]</span>
+		<span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cutable</span><span class="o">.</span><span class="n">keys</span><span class="p">())):</span>
+			<span class="n">xlist</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">cutable</span><span class="p">[</span><span class="n">key</span><span class="p">]])</span>
+
+		<span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">xlist</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s">&#39;float32&#39;</span><span class="p">)</span>
+		<span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_descriptors</span><span class="p">))</span>
+		
+		<span class="k">if</span> <span class="nb">type</span> <span class="ow">is</span> <span class="s">&#39;I&#39;</span><span class="p">:</span>		<span class="k">return</span> <span class="n">X</span><span class="p">[:,:</span><span class="mi">8</span><span class="p">]</span>
+		<span class="k">elif</span> <span class="nb">type</span> <span class="ow">is</span> <span class="s">&#39;A&#39;</span><span class="p">:</span> 	<span class="k">return</span> <span class="n">X</span><span class="p">[:,</span><span class="mi">8</span><span class="p">:</span><span class="mi">13</span><span class="p">]</span>
+		<span class="k">elif</span> <span class="nb">type</span> <span class="ow">is</span> <span class="s">&#39;M&#39;</span><span class="p">:</span>	<span class="k">return</span> <span class="n">X</span><span class="p">[:,</span><span class="mi">13</span><span class="p">:]</span>
+		<span class="k">elif</span> <span class="nb">type</span> <span class="ow">is</span> <span class="s">&#39;all&#39;</span><span class="p">:</span>	<span class="k">return</span> <span class="n">X</span>
+		<span class="k">else</span><span class="p">:</span>				<span class="k">raise</span> <span class="n">ArgumentError</span>
+
+	<span class="k">def</span> <span class="nf">convert_corpus_to_tagged_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s">&#39;all&#39;</span><span class="p">,</span> <span class="n">tag</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">map_flag</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Convert the corpus unit table to two compacted arrays: power metadata and MFCC metadata.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+
+		<span class="c"># get the info segments and filter those that are tagged</span>
+		<span class="n">info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">convert_corpus_to_array</span><span class="p">(</span><span class="s">&#39;I&#39;</span><span class="p">,</span> <span class="n">map_flag</span><span class="p">)</span>
+		
+		<span class="n">indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argwhere</span><span class="p">(</span><span class="n">info</span><span class="p">[:,</span><span class="mi">7</span><span class="p">]</span><span class="o">==</span><span class="n">tag</span><span class="p">)</span>
+<span class="c"># 		indices = np.reshape(indices, (indices.shape[0],))</span>
+
+		<span class="c"># use the tagged indices to pull out the tagged entries</span>
+		<span class="n">filtered_by_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">convert_corpus_to_array</span><span class="p">(</span><span class="nb">type</span><span class="p">)</span>
+		<span class="n">filtered_by_tag</span> <span class="o">=</span> <span class="n">filtered_by_type</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span>
+		<span class="n">filtered_by_tag</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">filtered_by_tag</span><span class="p">,</span> <span class="p">(</span><span class="n">indices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">filtered_by_type</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+
+		<span class="c"># add indices as a column (on the left)</span>
+		<span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">filtered_by_tag</span><span class="p">,</span> <span class="n">indices</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+		
+	
+	<span class="k">def</span> <span class="nf">cuids_for_sfid</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">seed_sfid</span><span class="p">):</span>
+		<span class="k">return</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cutable</span><span class="p">[</span><span class="n">entry</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cutable</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cutable</span><span class="p">[</span><span class="n">entry</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">seed_sfid</span><span class="p">]</span>
+			
+	<span class="k">def</span> <span class="nf">import_corpus_from_json</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">jsonpath</span><span class="p">,</span> <span class="n">appendflag</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">importflag</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Create a corpus from a json file.</span>
+<span class="sd">		Append flag - if True, add onto existing entries; if False, first clear corpus.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+ 		<span class="k">if</span> <span class="n">appendflag</span> <span class="ow">is</span> <span class="bp">False</span><span class="p">:</span>
+ 			<span class="k">print</span> <span class="s">&#39;appendflag is FALSE&#39;</span>
+ 			<span class="k">print</span> <span class="s">&#39;sf_offset: &#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sf_offset</span>
+ 			<span class="bp">self</span><span class="o">.</span><span class="n">reset_corpus</span><span class="p">()</span>
+ 		<span class="k">else</span><span class="p">:</span>
+ 			<span class="k">print</span> <span class="s">&#39;appendflag is TRUE&#39;</span>
+ 			<span class="k">print</span> <span class="s">&#39;sf_offset: &#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sf_offset</span> 			
+ 	 		
+		<span class="c">#set up</span>
+		<span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">jsonpath</span><span class="p">,</span> <span class="s">&#39;r&#39;</span><span class="p">)</span>
+		<span class="n">j</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+		
+		<span class="n">soundfiles</span> <span class="o">=</span> <span class="n">j</span><span class="p">[</span><span class="s">&#39;soundfiletree&#39;</span><span class="p">]</span>
+		<span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">soundfiles</span><span class="p">:</span>
+			<span class="n">sf</span> <span class="o">=</span> <span class="n">soundfiles</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+			<span class="c"># print sf</span>
+			<span class="k">try</span><span class="p">:</span>
+				<span class="n">pkey</span> <span class="o">=</span> <span class="n">sf</span><span class="p">[</span><span class="s">&#39;parent_id&#39;</span><span class="p">]</span>
+			<span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+				<span class="n">sfid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_sound_file</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="n">sf</span><span class="p">[</span><span class="s">&#39;path&#39;</span><span class="p">],</span> 
+											<span class="n">sfid</span><span class="o">=</span><span class="n">sf</span><span class="p">[</span><span class="s">&#39;sfID&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">sf_offset</span><span class="p">,</span> 
+											<span class="n">srcFileID</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> 
+											<span class="n">tratio</span><span class="o">=</span><span class="n">sf</span><span class="p">[</span><span class="s">&#39;tratio&#39;</span><span class="p">],</span> 
+											<span class="n">sfGrpID</span><span class="o">=</span><span class="n">sf</span><span class="p">[</span><span class="s">&#39;group&#39;</span><span class="p">],</span> 
+<span class="c"># 											reuseFlag=True, </span>
+<span class="c"># 											importFlag=importFlag, </span>
+											<span class="n">uflag</span><span class="o">=</span><span class="n">sf</span><span class="p">[</span><span class="s">&#39;unique_id&#39;</span><span class="p">])</span>
+		<span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">soundfiles</span><span class="p">:</span>
+			<span class="n">sf</span> <span class="o">=</span> <span class="n">soundfiles</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+			<span class="c">#print key, &#39; | &#39;, sf[&#39;parent_id&#39;]</span>
+			<span class="c">#print type(key), &#39; || &#39;, type(sf[&#39;parent_id&#39;])</span>
+			<span class="k">try</span><span class="p">:</span>
+				<span class="n">pid</span> <span class="o">=</span> <span class="n">sf</span><span class="p">[</span><span class="s">&#39;parent_id&#39;</span><span class="p">]</span>
+				
+				<span class="c"># params_with_dur = sf[&#39;params&#39;] + [&#39;dur&#39;, sf[ sf[&#39;parent_id&#39;] ]]</span>
+
+				<span class="c">#print key, &#39; | &#39;, soundfiles[key][&#39;sfid&#39;], &#39; | &#39;, soundfiles[key][&#39;parent_id&#39;]</span>
+				<span class="n">sfid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_sound_file</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> 
+												<span class="n">sfid</span><span class="o">=</span><span class="n">sf</span><span class="p">[</span><span class="s">&#39;sfid&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">sf_offset</span><span class="p">,</span> 
+												<span class="n">srcFileID</span><span class="o">=</span><span class="n">pid</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">sf_offset</span><span class="p">,</span> 
+												<span class="n">tratio</span><span class="o">=</span><span class="n">sf</span><span class="p">[</span><span class="s">&#39;tratio&#39;</span><span class="p">],</span> 
+												<span class="n">sfGrpID</span><span class="o">=</span><span class="n">sf</span><span class="p">[</span><span class="s">&#39;group&#39;</span><span class="p">],</span>
+												<span class="n">synthdef</span><span class="o">=</span><span class="n">sf</span><span class="p">[</span><span class="s">&#39;synth&#39;</span><span class="p">],</span> 
+												<span class="n">params</span><span class="o">=</span><span class="n">sf</span><span class="p">[</span><span class="s">&#39;params&#39;</span><span class="p">],</span>
+												<span class="n">uflag</span><span class="o">=</span><span class="n">sf</span><span class="p">[</span><span class="s">&#39;unique_id&#39;</span><span class="p">])</span>
+			<span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+				<span class="k">pass</span>
+				<span class="c">#print &#39;Uh-oh&#39;</span>
+				
+		<span class="n">corpusunits</span> <span class="o">=</span> <span class="n">j</span><span class="p">[</span><span class="s">&#39;corpusunits&#39;</span><span class="p">]</span>
+		<span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">corpusunits</span><span class="p">:</span>
+			<span class="c"># print &#39;-----------------------&#39;</span>
+			<span class="c"># print int(key)</span>
+			<span class="c"># print json.loads(corpusunits[key])</span>
+			<span class="n">cunit</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">corpusunits</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+			<span class="n">cunit</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cu_offset</span>
+			<span class="n">cunit</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sf_offset</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">add_corpus_unit</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">cu_offset</span><span class="p">,</span> <span class="n">cunit</span><span class="p">)</span>
+		
+		<span class="bp">self</span><span class="o">.</span><span class="n">sf_offset</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span> <span class="o">+</span> <span class="mi">1</span>
+		<span class="k">print</span> <span class="s">&#39;UPDATE max sfid --&gt; sf_offset: &#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sf_offset</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">cu_offset</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cutable</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span> <span class="o">+</span> <span class="mi">1</span>
+		<span class="k">print</span> <span class="s">&#39;UPDATE max cutable key --&gt; cu_offset: &#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cu_offset</span>
+		
+		<span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+		
+	
+	<span class="k">def</span> <span class="nf">export_corpus_to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">jsonpath</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Write the data to a structured JSON representation in a .json file.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		
+		<span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">jsonpath</span><span class="p">,</span> <span class="s">&#39;w&#39;</span><span class="p">)</span>
+		<span class="c"># don&#39;t forget the descriptors...</span>
+		<span class="n">toplevel</span> <span class="o">=</span> <span class="p">{</span> <span class="s">&#39;descriptors&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">dtable</span> <span class="p">}</span>
+		<span class="n">sf</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="k">for</span> <span class="n">sfid</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+			<span class="n">sf</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sftree</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfid</span><span class="p">]</span><span class="o">.</span><span class="n">render_json</span><span class="p">()</span>
+		<span class="n">toplevel</span><span class="p">[</span><span class="s">&#39;soundfiletree&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sf</span>
+		<span class="c"># roll the cutable rows into dictionary</span>
+		<span class="n">d</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+<span class="c"># 		print &#39;keys: &#39;, self.cutable.keys()</span>
+		<span class="k">for</span> <span class="n">cid</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cutable</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+<span class="c"># 			print &#39;cutable entry: &#39;, type(self.cutable[cid])</span>
+			<span class="n">d</span><span class="p">[</span><span class="n">cid</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cutable</span><span class="p">[</span><span class="n">cid</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+		<span class="n">toplevel</span><span class="p">[</span><span class="s">&#39;corpusunits&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">d</span>
+		
+		<span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">jsonpickle</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">toplevel</span><span class="p">))</span>	
+		<span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+	
+
+<span class="k">class</span> <span class="nc">CorpusSoundFileTree</span><span class="p">:</span>
+
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">crps</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">corpus</span> <span class="o">=</span> <span class="n">crps</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">anchorPath</span> <span class="o">=</span> <span class="n">path</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">nodes</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">trackbacks</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		
+<span class="c">#	def checkForDuplicateNodes(self, nodename):</span>
+<span class="c">#		for i,pair in enumerate(self.nodes.iteritems()):</span>
+<span class="c">#			if p[1].synth == nodename</span>
+
+	<span class="k">def</span> <span class="nf">add_root_node</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">sfID</span><span class="p">,</span> <span class="n">tratio</span><span class="p">,</span> <span class="n">sfg</span><span class="p">,</span> <span class="n">snd_subdir</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">uniqueFlag</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+<span class="c"># 		print &quot;add file: &quot;, filename, &quot;for sfid: &quot;, sfID</span>
+		<span class="k">if</span> <span class="n">snd_subdir</span><span class="p">:</span>
+			<span class="n">joined_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">anchorPath</span><span class="p">,</span> <span class="s">&#39;snd&#39;</span><span class="p">,</span> <span class="n">snd_subdir</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="n">joined_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">anchorPath</span><span class="p">,</span> <span class="s">&#39;snd&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+<span class="c"># 		print &quot;joined: &quot;, joined_path</span>
+		<span class="k">if</span> <span class="n">uniqueFlag</span><span class="p">:</span>
+			<span class="n">flag</span> <span class="o">=</span> <span class="n">uniqueFlag</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="n">flag</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="mf">1300000000.0</span> <span class="c">## SUN March 13, 2011 ca. 3AM == 1.3 billion seconds since epoch</span>
+		
+		<span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">closing</span><span class="p">(</span><span class="n">wave</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">joined_path</span><span class="p">,</span><span class="s">&#39;r&#39;</span><span class="p">))</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+			<span class="n">frames</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">getnframes</span><span class="p">()</span>
+			<span class="n">rate</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">getframerate</span><span class="p">()</span>
+			<span class="n">dur</span> <span class="o">=</span> <span class="n">frames</span><span class="o">/</span><span class="nb">float</span><span class="p">(</span><span class="n">rate</span><span class="p">)</span>
+			<span class="n">chnls</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">getnchannels</span><span class="p">()</span>
+		
+		<span class="k">if</span> <span class="n">chnls</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span> <span class="n">synthdef</span> <span class="o">=</span> <span class="s">&#39;monoSamplerNRT&#39;</span>
+		<span class="k">else</span><span class="p">:</span> <span class="n">synthdef</span> <span class="o">=</span> <span class="s">&#39;stereoSamplerNRT&#39;</span>
+<span class="c"># 		print &#39;SD: &#39;, synthdef</span>
+		
+		<span class="k">try</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfID</span><span class="p">]</span> <span class="o">=</span> <span class="n">SamplerNode</span><span class="p">(</span><span class="n">joined_path</span><span class="p">,</span> <span class="n">synthdef</span><span class="p">,</span> <span class="n">dur</span><span class="p">,</span> <span class="n">flag</span><span class="p">,</span> <span class="n">chnls</span><span class="p">,</span> <span class="n">sfg</span><span class="p">,</span> <span class="n">tratio</span><span class="p">,</span> <span class="n">sfID</span><span class="p">)</span>
+			
+			<span class="c"># secondary mappings</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">corpus</span><span class="o">.</span><span class="n">map_id_to_sf</span><span class="p">(</span><span class="n">joined_path</span><span class="p">,</span> <span class="n">sfID</span><span class="p">,</span> <span class="n">sfg</span><span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">trackbacks</span><span class="p">[</span><span class="n">sfID</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">joined_path</span><span class="p">,</span> <span class="n">dur</span><span class="p">,</span> <span class="n">tratio</span><span class="p">,</span> <span class="n">synthdef</span><span class="p">]</span> <span class="c"># a more compact representation</span>
+		
+<span class="c">#			return joined_path, sfg, tratio</span>
+			<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">sfID</span><span class="p">]</span>
+		<span class="k">except</span><span class="p">:</span>
+		    <span class="k">print</span> <span class="s">&quot;Unexpected error:&quot;</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+		    <span class="k">raise</span>
+		<span class="k">return</span> <span class="bp">None</span>
+	
+		
+	<span class="k">def</span> <span class="nf">add_child_node</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parentID</span><span class="p">,</span> <span class="n">childID</span><span class="p">,</span> <span class="n">tratio</span><span class="p">,</span> <span class="n">sfg</span><span class="p">,</span> <span class="n">synthdef</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">uniqueFlag</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">if</span> <span class="n">uniqueFlag</span><span class="p">:</span>
+			<span class="n">flag</span> <span class="o">=</span> <span class="n">uniqueFlag</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="n">flag</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="mf">1300000000.0</span>
+		
+		<span class="k">try</span><span class="p">:</span>
+			<span class="n">parentNode</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">parentID</span><span class="p">]</span>
+		<span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;Parent</span><span class="se">\&#39;</span><span class="s">s childID is not found. Child node was not added&#39;</span>
+			<span class="k">return</span> <span class="bp">None</span>
+		<span class="k">try</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">childID</span><span class="p">]</span> <span class="o">=</span> <span class="n">EfxNode</span><span class="p">(</span><span class="n">synthdef</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">parentNode</span><span class="o">.</span><span class="n">duration</span><span class="p">,</span> <span class="n">flag</span><span class="p">,</span> <span class="n">parentNode</span><span class="o">.</span><span class="n">channels</span><span class="p">,</span> <span class="n">sfg</span><span class="p">,</span> <span class="n">parentNode</span><span class="o">.</span><span class="n">tratio</span><span class="p">,</span> <span class="n">childID</span><span class="p">,</span> <span class="n">parentID</span><span class="p">)</span>
+
+			<span class="c"># secondary mappings</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">corpus</span><span class="o">.</span><span class="n">map_id_to_sf</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">parentID</span><span class="p">]</span><span class="o">.</span><span class="n">sfpath</span><span class="p">,</span> <span class="n">childID</span><span class="p">,</span> <span class="n">sfg</span><span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">trackbacks</span><span class="p">[</span><span class="n">childID</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">synthdef</span><span class="p">,</span> <span class="n">params</span><span class="p">]</span>
+			
+<span class="c">#			return childID, sfg, tratio</span>
+			<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">childID</span><span class="p">]</span><span class="o">.</span><span class="n">sfid</span><span class="p">]</span>
+
+		<span class="k">except</span><span class="p">:</span>
+		    <span class="k">print</span> <span class="s">&quot;Unexpected error:&quot;</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+		    <span class="k">raise</span>
+		<span class="k">return</span> <span class="bp">None</span>
+
+
+<span class="k">class</span> <span class="nc">Node</span><span class="p">:</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">synthname</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">duration</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">uniqueID</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">channels</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">tratio</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">sfID</span><span class="o">=-</span><span class="mi">1</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">synth</span> <span class="o">=</span> <span class="n">synthname</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">params</span> <span class="o">=</span> <span class="n">params</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">duration</span> <span class="o">=</span> <span class="n">duration</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">unique_id</span> <span class="o">=</span> <span class="n">uniqueID</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">channels</span> <span class="o">=</span> <span class="n">channels</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">group</span> <span class="o">=</span> <span class="n">group</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">tratio</span> <span class="o">=</span> <span class="n">tratio</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">sfid</span> <span class="o">=</span> <span class="n">sfID</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">unit_segments</span> <span class="o">=</span> <span class="p">[]</span> <span class="c"># create an empty container for unit bounds and tags</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">unit_amps</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">unit_mfccs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">verify_synthname_and_params</span><span class="p">()</span>
+
+	<span class="k">def</span> <span class="nf">verify_synthname_and_params</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="c"># check that synthname is a string</span>
+		<span class="c"># check that it exists in the synthdefs dir for this corpus</span>
+		<span class="c"># check that params match expected params</span>
+		<span class="c">#	 optionally warn if they do not</span>
+		<span class="k">pass</span>
+	
+	<span class="k">def</span> <span class="nf">add_onset_and_dur_pair</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">onset</span><span class="p">,</span> <span class="n">dur</span><span class="p">,</span> <span class="n">relid</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+<span class="c"># 		print &#39;$$$ &#39;, onset, &#39;|&#39;, dur, &#39;|(&#39;, relid, &#39;)&#39;</span>
+		<span class="k">if</span> <span class="n">relid</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span> <span class="n">relid</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">)</span>
+		<span class="k">try</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span><span class="o">.</span><span class="n">onset</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">onset</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">duration</span><span class="p">)</span>
+		<span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">unit_segments</span> <span class="o">+=</span> <span class="p">[</span><span class="n">SFU</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">onset</span><span class="p">),</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">duration</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tratio</span><span class="p">)))]</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span><span class="o">.</span><span class="n">dur</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(((</span><span class="bp">self</span><span class="o">.</span><span class="n">duration</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tratio</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span><span class="o">.</span><span class="n">onset</span><span class="p">),</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dur</span><span class="p">))</span>
+		
+		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span>
+	
+	<span class="k">def</span> <span class="nf">update_unit_segment_params</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">relid</span><span class="p">,</span> <span class="n">onset</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">dur</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">tag</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+		<span class="k">if</span> <span class="n">onset</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span><span class="o">.</span><span class="n">onset</span> <span class="o">=</span> <span class="n">onset</span>
+		<span class="k">if</span> <span class="n">dur</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span><span class="o">.</span><span class="n">dur</span> <span class="o">=</span> <span class="n">dur</span>
+		<span class="k">if</span> <span class="n">tag</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span><span class="o">.</span><span class="n">tag</span> <span class="o">=</span> <span class="n">tag</span>
+		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span>
+	
+	<span class="k">def</span> <span class="nf">calc_remaining_dur</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Purely a convenience function for cases where non-overlapping segments are assumed!</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">duration</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">onset</span><span class="p">)</span>
+	
+	<span class="k">def</span> <span class="nf">sort_segments_list</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">return</span>  <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit_segments</span><span class="p">]</span> <span class="c">#.sort(key=lambda unit: unit[0])</span>
+	
+	<span class="k">def</span> <span class="nf">add_metadata_for_relid</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">relid</span><span class="p">,</span> <span class="n">amps</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">mfccs</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+		<span class="k">if</span> <span class="n">relid</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">amps</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit_amps</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span> <span class="o">=</span> <span class="n">amps</span>
+		<span class="k">if</span> <span class="n">relid</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">mfccs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit_mfccs</span><span class="p">[</span><span class="n">relid</span><span class="p">]</span> <span class="o">=</span> <span class="n">mfccs</span>
+		
+	
+<div class="viewcode-block" id="SamplerNode"><a class="viewcode-back" href="../../corpusdb.html#corpusdb.corpusdb.SamplerNode">[docs]</a><span class="k">class</span> <span class="nc">SamplerNode</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
+	<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	SamplerNode(joined_path, synthdef, dur, flag, chnls, sfg, tratio, sfID)</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sfpath</span><span class="p">,</span> <span class="n">synthname</span><span class="p">,</span> <span class="n">duration</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">uniqueID</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">channels</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">tratio</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">sfID</span><span class="o">=-</span><span class="mi">1</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">try</span><span class="p">:</span>
+			<span class="n">Node</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">synthname</span><span class="p">,</span> <span class="bp">None</span><span class="p">,</span> <span class="n">duration</span><span class="p">,</span> <span class="n">uniqueID</span><span class="p">,</span> <span class="n">channels</span><span class="p">,</span> <span class="n">group</span><span class="p">,</span> <span class="n">tratio</span><span class="p">,</span> <span class="n">sfID</span><span class="p">)</span>
+		<span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;Atrribute Error in superclass init&#39;</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">sfpath</span> <span class="o">=</span> <span class="n">sfpath</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">verify_sf</span><span class="p">()</span>
+
+	<span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">return</span> <span class="s">&quot;Sampler Node: </span><span class="si">%s</span><span class="s"> (duration: </span><span class="si">%.2f</span><span class="s">)&quot;</span><span class="o">%</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sfpath</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">duration</span><span class="p">)</span>
+
+	<span class="k">def</span> <span class="nf">verify_sf</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="c"># check that sfpath is a string</span>
+		<span class="c"># check that it exists in the sounds dir (or a subdir) for this corpus</span>
+		<span class="k">pass</span>
+	
+<div class="viewcode-block" id="SamplerNode.render_json"><a class="viewcode-back" href="../../corpusdb.html#corpusdb.corpusdb.SamplerNode.render_json">[docs]</a>	<span class="k">def</span> <span class="nf">render_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">return</span> <span class="p">{</span> <span class="s">&#39;path&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">sfpath</span><span class="p">,</span>
+			<span class="s">&#39;synth&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">synth</span><span class="p">,</span>
+			<span class="s">&#39;params&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">,</span>
+			<span class="s">&#39;duration&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">duration</span><span class="p">,</span>
+			<span class="s">&#39;unique_id&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">unique_id</span><span class="p">,</span>
+			<span class="s">&#39;channels&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">channels</span><span class="p">,</span>
+			<span class="s">&#39;group&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">group</span><span class="p">,</span>
+			<span class="s">&#39;tratio&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">tratio</span><span class="p">,</span>
+			<span class="s">&#39;sfID&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">sfid</span> <span class="p">}</span>
+</div></div>
+<div class="viewcode-block" id="EfxNode"><a class="viewcode-back" href="../../corpusdb.html#corpusdb.corpusdb.EfxNode">[docs]</a><span class="k">class</span> <span class="nc">EfxNode</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
+	<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	EfxNode(synthdef, params, parentNodeMD[&#39;duration&#39;], flag, parentNodeMD[&#39;channels&#39;], sfg, childID, parentID, parentNodeMD[&#39;tratio&#39;])</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">synthname</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">duration</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">uniqueID</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">channels</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">tratio</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">childID</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">parentID</span><span class="o">=-</span><span class="mi">1</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">try</span><span class="p">:</span>
+			<span class="n">Node</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">synthname</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">duration</span><span class="p">,</span> <span class="n">uniqueID</span><span class="p">,</span> <span class="n">channels</span><span class="p">,</span> <span class="n">group</span><span class="p">,</span> <span class="n">tratio</span><span class="p">,</span> <span class="n">childID</span><span class="p">)</span>
+		<span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;Atrribute Error in superclass init&#39;</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">parent_id</span> <span class="o">=</span> <span class="n">parentID</span>
+	
+	<span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">return</span> <span class="s">&quot;EFX Node: </span><span class="si">%s</span><span class="s"> (parent id: </span><span class="si">%i</span><span class="s">)&quot;</span><span class="o">%</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">synth</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_id</span><span class="p">)</span>
+
+	<span class="k">def</span> <span class="nf">verify_synthname_and_params</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">pass</span>
+	
+<div class="viewcode-block" id="EfxNode.render_json"><a class="viewcode-back" href="../../corpusdb.html#corpusdb.corpusdb.EfxNode.render_json">[docs]</a>	<span class="k">def</span> <span class="nf">render_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">return</span> <span class="p">{</span> <span class="s">&#39;parent_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_id</span><span class="p">,</span>
+			<span class="s">&#39;synth&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">synth</span><span class="p">,</span>
+			<span class="s">&#39;params&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">,</span>
+			<span class="s">&#39;duration&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">duration</span><span class="p">,</span>
+			<span class="s">&#39;unique_id&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">unique_id</span><span class="p">,</span>
+			<span class="s">&#39;channels&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">channels</span><span class="p">,</span>
+			<span class="s">&#39;group&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">group</span><span class="p">,</span>
+			<span class="s">&#39;tratio&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">tratio</span><span class="p">,</span>
+			<span class="s">&#39;sfid&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">sfid</span> <span class="p">}</span>
+</div></div>
+<span class="k">class</span> <span class="nc">SynthNode</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">synthname</span><span class="p">,</span> <span class="n">params</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">try</span><span class="p">:</span>
+			<span class="n">Node</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">synthname</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+		<span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;Atrribute Error in superclass init&#39;</span>
+
+	<span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">return</span> <span class="s">&quot;Synth Node: </span><span class="si">%s</span><span class="s">&quot;</span><span class="o">%</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">synth</span><span class="p">)</span>
+
+
+
+<span class="k">class</span> <span class="nc">SFU</span><span class="p">():</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">onset</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">dur</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">tag</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">onset</span> <span class="o">=</span> <span class="n">onset</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">dur</span> <span class="o">=</span> <span class="n">dur</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">tag</span> <span class="o">=</span> <span class="n">tag</span>
+		
+	<span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="k">return</span> <span class="s">&quot;Sound File Unit: (</span><span class="si">%f</span><span class="s">, </span><span class="si">%f</span><span class="s">) tag: </span><span class="si">%i</span><span class="s">&quot;</span><span class="o">%</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">onset</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dur</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">)</span>	
+	<span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">onset</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dur</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">]</span>
+	
+	<span class="k">def</span> <span class="nf">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+		<span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">onset</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">onset</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dur</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">dur</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">tag</span><span class="p">)</span>
+	<span class="k">def</span> <span class="nf">__ne__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+		<span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">onset</span> <span class="o">!=</span> <span class="n">other</span><span class="o">.</span><span class="n">onset</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dur</span> <span class="o">!=</span> <span class="n">other</span><span class="o">.</span><span class="n">dur</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tag</span> <span class="o">!=</span> <span class="n">other</span><span class="o">.</span><span class="n">tag</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">CU</span><span class="p">():</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">pass</span>
+	<span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">return</span> <span class="s">&quot;Corpus Unit: </span><span class="si">%i</span><span class="s">&quot;</span><span class="o">%</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+        </div>
+        <div class="sidebar">
+          <h3>Table Of Contents</h3>
+          <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../corpusdb.html">corpusdb - database of sound files and metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../corpussoundfiletree.html">corpussoundfiletree - representation of sounds and processed versions as nodes in tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../nrtoscparser.html">nrtoscparser - convert synth parameters into non-realtime (NRT) synthesis .osc files</a></li>
+</ul>
+
+          <h3 style="margin-top: 1.5em;">Search</h3>
+          <form class="search" action="../../search.html" method="get">
+            <input type="text" name="q" />
+            <input type="submit" value="Go" />
+            <input type="hidden" name="check_keywords" value="yes" />
+            <input type="hidden" name="area" value="default" />
+          </form>
+          <p class="searchtip" style="font-size: 90%">
+            Enter search terms or a module, class or function name.
+          </p>
+        </div>
+        <div class="clearer"></div>
+      </div>
+    </div>
+
+    <div class="footer-wrapper">
+      <div class="footer">
+        <div class="left">
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |
+          <a href="../../genindex.html" title="General Index"
+             >index</a>
+        </div>
+
+        <div class="right">
+          
+    <div class="footer">
+        &copy; Copyright 2013, Tom Stoll.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+        </div>
+        <div class="clearer"></div>
+      </div>
+    </div>
+
+  </body>
+</html>
