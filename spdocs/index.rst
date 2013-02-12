@@ -19,11 +19,16 @@ Dependencies
 * Download `sc3-plugins <http://sourceforge.net/projects/sc3-plugins/files/OSX_3.6/SC3ExtPlugins-universal.dmg/download>`_ and install.
 * SC-0.3.1 - bundled with CorpusDB; see `pypi.python.org/pypi/SC/0.3.1 <http://pypi.python.org/pypi/SC/0.3.1>`_.
 * jsonpickle - also bundled; see `pypi.python.org/pypi/jsonpickle <http://pypi.python.org/pypi/jsonpickle>`_.
+* `Scipy Superpack <https://github.com/fonnesbeck/ScipySuperpack>`_ - technically, only numpy is required, but the Superpack is the way to go
+
+Optional, but highly recommended
+--------------------------------
+* `Bregman MIR Toolkit <http://digitalmusics.dartmouth.edu/bregman/>`_.
 
 Installation
 ============
 
-Unzip, ``cd``, and install: ``sudo python setup.py install`` Do the same for SC-0.3.1 and json pickle.
+Unzip, ``cd``, and install: ``sudo python setup.py install`` Do the same for SC-0.3.1 and jsonpickle.
 
 
 
