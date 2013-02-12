@@ -8,9 +8,9 @@ CorpusDB
 
 Introduction
 ============
-CorpusDB is a collection of Python classes for maintaining a database describing a corpus of sound files. There are three essential parts to this database: representation of the sounds, metadata derived from analysis of the sounds, and tools to access that data. CorpusDB relies on scsynth, by way of its command line interface (using Python's subprocess module). Furthermore, important relationships between sound files are encoded in the database, namely parent/child relationships that can be used to define source sound/processed sound relationships.
+CorpusDB is a collection of Python classes for maintaining a database describing a corpus of sound files. There are three essential parts to this database: representation of the sounds, metadata derived from analysis of the sounds, and tools to access that data. CorpusDB relies on scsynth, by way of its command line interface (using Python's subprocess module). Furthermore, important relationships between sound files are encoded in the database, namely parent/child relationships that can be used to define source sound-processed sound relationships.
 
-More on the architecture and design of CorpusDB can be found in the ..TBA.. document.
+More on the architecture and design of CorpusDB can be found in the `design <design.html>`_ document.
 
 Why CorpusDB?
 -------------
@@ -23,7 +23,7 @@ There are some great tools out there for MIR, and also for corpus-based concaten
 * Trees/Nodes - structure allows for relationships between source sounds and derivations
 * Interoperability - data can be easily processed and displayed with Numpy, Bregman and other tools
 * Generative - serves as a perfect tool for tracking and representing sounds and sound-making algorithms in a generative system
-* CBPSC - the SuperCollider sclang companion project to CorpusDB, will be synced with CorpusDB for complete interoperability
+* CBPSC - the sclang companion project to CorpusDB; to be kept synced with CorpusDB for complete interoperability.
 
 Dependencies
 ============
@@ -44,6 +44,7 @@ Installation
 
 Unzip, ``cd``, and install: ``sudo python setup.py install`` Do the same for SC-0.3.1 and jsonpickle.
 
+If you do not have admin (sudo) privileges, you can install in your home path using the --prefix "$HOME" option to setup.py
 
 Tutorials
 =========
