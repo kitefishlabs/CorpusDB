@@ -10,7 +10,7 @@ setup(name = 'corpusdb',
     author_email = 'tms@kitefishlabs.com',
     url = 'http://www.kitefishlabs.com',
 
-    packages = [ 'corpusdb' ], #, 'corpussoundfiletree', 'nrtoscparser' ],
+    packages = [ 'corpusdb' ],
     data_files = [ ]
 )
 
