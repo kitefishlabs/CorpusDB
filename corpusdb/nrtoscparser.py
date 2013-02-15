@@ -17,14 +17,17 @@ __license__ = "gpl 3.0 or higher"
 __email__ = 'tms@kitefishlabs.com'
 
 
-import struct, math, os, string
+import sc, time, struct, math, os, string
 from scosc import OSC
 from scosc import tools
 from scosc import osctools
 
 class NRTOSCParser:
-	def __init__(self, sr=44100, anchor='/Users/kfl/'):
-		self.lib = { 'bndl': self.padBytes('#bundle'), 'zero': self.padBytes(0), 'anchor': anchor }
+	"""
+	anchor = corpus anchor (directory where corpus resides)
+	"""
+	def __init__(self, anchor=''):
+		self.anchor = anchor
 	
 	def absToOSCTimestamp(self, abs):
 		return struct.pack('!LL', math.floor(abs), long(float(abs - long(abs)) * 4294967296L))
@@ -53,7 +56,6 @@ class NRTOSCParser:
 				timestamp = self.absToOSCTimestamp(line[0])
 				max_timestamp = max(max_timestamp, (line[0] + 0.01))
 				bundle.extend(timestamp)
-# 				print line[1]
 				bundle.extend("\x00\x00\x00\x00")
 				commands = line[1]
 				bundle.extend(self.padBytes(commands[0]))
@@ -66,15 +68,11 @@ class NRTOSCParser:
 					elif type(item) == type(0.2):
 						types += 'f'
 				types = self.padBytes(types)
-# 				print "BUNDLE: " + bundle
 				bundle.extend(types)
 				for item in commands[1:]:
 						translated = self.padBytes(item)
-						#print "        ", translated
 						bundle.extend(translated)
-# 				print "***LENGTH: ", len(bundle)
 				total_length += len(bundle)
-# 				for c in bundle: print("::: ", c, chr(c))
 				bundle[3] = len(bundle) - 4
 				bundle[23] = len(bundle) - 24
 				f.write(bundle)
@@ -84,30 +82,37 @@ class NRTOSCParser:
 			
 			footer += "\x00\x00\x00\x00\x00\x00\x00\x08\x00\x00\x00\x00,\x00\x00\x00"
 			total_length += len(footer)
-# 			print "footer:"
-# 			for c in footer: print("::: ", c, chr(c))
 			
 			f.write(footer)
-#			print "total_length: " + `total_length`
-
-	def createNRTScore(self, sfpath = '/Users/kfl/76444.wav',
-						sfid = 0,
+	
+	
+	
+	def createNRTScore(self, sfpath = '/Users/me/corpus/snd/76444.wav',
 						pBuf = 10,
 						aBuf = 11,
-						currBus = 10, # internally?
-						tratio = 1.0, # arg?
-						srate = 44100,
+						tratio = 1.0,
 						duration = 1.0,
-						oscDir = '/Users/kfl/score.osc',
+						oscDir = '/Users/me/corpus/snd/score.osc',
 						synthdef = 'monoSamplerNRT',
 						efxSynthdefs = None,
 						params = None):
+		"""
+		args:
+			sfpath			-	full path to sound file that is being played/processed/analyzed
+			pBuf			-	playback buffer id
+			aBuf			-	analysis buffer id
+			tratio			-	transposition
+			duration 		-	make this longer for processed sounds with delay components
+			oscDir			-	path to dir where SC .osc files are saved (.../corpus/osc/ by convention)
+			synthdef		-	playback synthdef
+			efxSynthdefs	-	list of processing synthdefs
+			params			-	list of lists of processing synthdefs' parameters
+		"""	
 		
+		# change to directory containing sound file and add an md dir if not already present
 		cwd = os.path.abspath(sfpath)
 		fname = string.split(os.path.basename(sfpath), '.')
-		cwd = os.path.dirname(cwd)
-		
-		#print 'CWD: ',  cwd
+		cwd = os.path.dirname(cwd)		
 		os.chdir(cwd)
 		## create a subdirectory 'md' if it doesn't already exist (ignore the error)
 		try: 
@@ -115,35 +120,30 @@ class NRTOSCParser:
 		except OSError:
 			#print "Warning: md already exists"
 			pass
-	
+		
+		# full path to metadata (md) file
 		mdpath = cwd + '/md/' + fname[0] + '_' + `tratio` + '.md.' + fname[1]
 	
-		## the two alloc calls
+		## the two buffer alloc calls
 		oscList = [[0.0, ["/b_allocReadChannel", pBuf, sfpath, 0, -1, '[0]']]]
-		oscList += [[0.01, ["/b_alloc", aBuf, int(math.ceil((duration/0.04) / tratio)), 26]]]
+		oscList += [[0.01, ["/b_alloc", aBuf, int(math.ceil((duration/0.04) / tratio)), 25]]]
 		
-		sdefs = [synthdef, 'power_centroid_mfcc24BusAnalyzerNRT']
-		
+		# minimal list of 2 Synthdefs, playback --> analysis
+		sdefs = [synthdef, 'power_mfcc24BusAnalyzerNRT']
+		# insert effect/processing Synthdefs...
 		if efxSynthdefs is not None:
 			for sdef in efxSynthdefs:
 				sdefs.insert(-1, sdef)
-		#print '===EFX:::'
-		#print sdefs
-		
+		# ... and their parameters
 		rows = [['srcbufNum', pBuf, 'outbus', 0, 'dur', duration, 'transp', tratio], ['inbus', 0, 'savebufNum', aBuf, 'transp', tratio]]
-		
+		# params are parameters unique to efx synths
 		if params is not None:
 			# insert params into middle of rows!
 			for prow in params:
 				rows.insert(-1,prow)
-		
-		#print 'rows INITIALLY: ' + `rows`
-		##for node in row:
+		# rewrite the params in rows so that they have correct/logical values		
 		for r, row in enumerate(rows):
-			#print 'enumerating row: ' + `row`
-			#print 'row INITIALLY: ' + `row`
 			for index, val in enumerate(row):
-				##print 'enumerating val: ' + `val` + ' ' + `index`
 				if val == 'srcbufNum':
 					row[index+1] = pBuf
 				elif val == 'savebufNum':
@@ -155,20 +155,19 @@ class NRTOSCParser:
 				elif val == 'inbus':
 					row[index+1] = currBus
 					currBus += 1
-			#print 'row FINALLY: ' + `row`
-			#print 'currBus currently: ' + `currBus`
+			# now write the Synths
 			if r == 0:
 				oscList += [[0.02, (["/s_new", sdefs[r], -1, 0, 0] + rows[r])]]
 			else:
 				oscList += [[0.02, (["/s_new", sdefs[r], -1, 1, 0] + rows[r])]]
 		
+		# now write the buffer-write and end-point lines
 		oscList += [[((duration / tratio) + 0.03), ["/b_write", aBuf, mdpath, "wav", "float32"]]]
-		## don't free any buffers (yet)
 		oscList += [[((duration / tratio) + 0.04), ["/c_set", 0, 0]]]
-	
-# 		print "\nTHE LIST:: " + `oscList` + "\n"
-	
-		self.processAndWriteFile(oscList, oscDir)
 		
-		os.chdir(self.lib['anchor']) # always return pwd to the anchor dir
-	
+		# pass the osc list to function that writes binary .osc file
+		self.processAndWriteFile(oscList, oscDir)
+		# always return pwd to the anchor dir
+		os.chdir(self.lib['anchor'])
+
+

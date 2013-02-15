@@ -201,9 +201,7 @@ class CorpusDB:
 			efx_params = None
 		# print "### ", synthid, '\n', self.sftree.trackbacks[sfid][0], '\n', self.sftree.trackbacks[sfid][1]
 		self.parser.createNRTScore(fullpath, 
-									sfid=sfid, 
 									tratio=tratio, 
-									srate=self.rate, 
 									duration=self.sftree.nodes[sfid].duration, 
 									oscDir=oscpath, 
 									synthdef=self.sftree.nodes[synthid].synth, 
