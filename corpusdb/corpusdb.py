@@ -6,7 +6,28 @@ Part of corpusdb, corpus-based processing for SuperCollider + Python.
 Overview
 ========
 
-etc.
+CorpusDB maintains a database of sound files, raw data, processed data, and segmented units that together comprise a structured approach to characterizing, storing, and retrieving sound data based on features of that data.
+
+This system works with the following work flow:
+# Load audio file.
+# Analyze it.
+# Using raw analysis data, segment the audio into units.
+# Store units.
+# [Repeat steps 1-4 for additional audio files]
+# Export corpus to JSON file.
+# Use metadata for matching, similarity, etc. algorithms.
+
+Every sound file incorporated in a corpus is stored according to the Synthdefs that produce it. This way, a sound file and the chain of processing stages that modify said sound are represented. This is a simple form of data compression. Once analyzed, metadata produced by the analysis are stored in a table. An index links the metadata to the sound-recording-plus-processing recipe.
+
+Analytical tasks and compositional processes are built on top of this structured representation of sounds. The user is free to use the data as he/she wishes.
+
+This Python implementation uses SC-0.3.1, SuperCollider---the command line interface, plus the subprocess module to trigger non-real time analysis and synthesis. The parallel SC-native implementation (cbpsc) is better suited for real time use and is currently (2/2013) being rewritten to reflect changes made when developing the Python version. It is the developer's goal to maintain parallel, interoperable versions of this software.
+
+TO DO:
+* finish SC reimplementation/upgrade
+* extend SFTree/nodes model
+* implement synthesis nodes
+* simplify workflows
 
 """
 
