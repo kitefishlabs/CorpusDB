@@ -55,16 +55,16 @@ class CorpusDB:
 		
 		self.reset_corpus()
 				
-		self.parser = NRTOSCParser2.NRTOSCParser2()
+		self.parser = nrtoscparser.NRTOSCParser()
 			
 		self.sound_file_units_mapped = False
 		
-		if sudo_flag is True: resource.setrlimit(resource.RLIMIT_NOFILE, (16384, 16384)) #!!!
+		#if sudo_flag is True: resource.setrlimit(resource.RLIMIT_NOFILE, (16384, 16384)) #!!!
 		os.chdir(self.anchor) # just in case we created this corpus using a link...
 	
 	def reset_corpus(self):
-	
-		self.sftree = CorpusSoundFileTree(self, self.anchor)
+		
+		self.sftree = sftree.SFTree(self, self.anchor)
 # 		self.segtable = dict() # segtable's role is now part of the sftree nodes!
 		self.cutable = dict()
 		# data structures for raw data and corpus data
@@ -164,7 +164,7 @@ class CorpusDB:
 			mfccs_vector = self.rawmaps[sfid].T[2:].T
 		except KeyError:
 			#print "key errors are good..."
-			self.rawmaps[sfid] = np.memmap(mdpath, dtype=np.float32, mode='r', offset=280, shape=(num_frames, 26))
+			self.rawmaps[sfid] = np.memmap(mdpath, dtype=np.float32, mode='r', offset=280, shape=(num_frames, 24))
 			power_vector = self.rawmaps[sfid].T[0]
 			mfccs_vector = self.rawmaps[sfid].T[2:].T
 		
@@ -231,20 +231,20 @@ class CorpusDB:
 
 		cmd = 'scsynth -N ' + oscpath + ' _ _ 44100 WAVE float32 -o 1'
 		args = shlex.split(cmd)
-		p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, close_fds=True)
+		rc = subprocess.call(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, close_fds=True)
 		
-		print 'PID: ', p.pid
-		rc = p.wait()
-				
+# 		print 'PID: ', p.pid
+# 		rc = p.wait()
+		
 		print 'RC: ', rc
 		if rc == 1:
 			cwd = os.path.abspath(fullpath)
 			fname = string.split(os.path.basename(fullpath), '.')
 			cwd = os.path.dirname(cwd)
 			mdpath = cwd + "/md/" + fname[0] + '_' + `tratio` + '.md.' + fname[1]
-			#print 'MDPATH for mapping: ', mdpath
+			print 'MDPATH for mapping: ', mdpath
 			num_frames = int(math.ceil(self.sftree.nodes[sfid].duration / self.HOP_SECS / tratio))
-			#print 'num frames: ', num_frames
+			print 'num frames: ', num_frames
 			# map it:
 			self.map_raw_sound_file(mdpath, sfid, num_frames)
 			## sftrees/trackbacks: handled in add_sound_file()!
@@ -362,7 +362,7 @@ class CorpusDB:
 		"""
 		segmented = self.get_sorted_units_list(sfid)
 		raw_amps, raw_mfccs, activation, cooked = self._activate_raw_metadata(sfid)
-		amps , reheated = [], [], []
+		amps , reheated = [], []
 		
 # 		print 'raw: ', raw_amps
 		amps_stripped = np.nan_to_num(raw_amps)
@@ -423,7 +423,7 @@ class CorpusDB:
 		try:
 			sfid = self.sfmap[path]
 		except KeyError:
-			print 'Error: there is no entry for ', path, ' in the sf map. Update SFU failed.'
+			print 'Error: there is no entry for ', path, ' in the sf map. Lookup SFID failed.'
 			return None
 		return sfid
 
@@ -533,14 +533,14 @@ class CorpusDB:
 		Create a corpus from a json file.
 		Append flag??? Should it be removed as a parameter.
 		"""
- 		if appendflag is False:
+		if appendflag is False:
  			print 'appendflag is FALSE'
- 			print 'sf_offset: ', self.sf_offset
- 			self.reset_corpus()
- 		else:
- 			print 'appendflag is TRUE'
- 			print 'sf_offset: ', self.sf_offset 			
- 	 		
+			print 'sf_offset: ', self.sf_offset
+			self.reset_corpus()
+		else:
+			print 'appendflag is TRUE'
+			print 'sf_offset: ', self.sf_offset 			
+			
 		#set up
 		f = open(jsonpath, 'r')
 		j = json.load(f)
@@ -550,26 +550,26 @@ class CorpusDB:
 			sf = soundfiles[key]
 			# print sf
 			try:
-				pkey = sf['parent_id']
+				pkey = sf['parentID']
 			except KeyError:
 				sfid = self.add_sound_file(filename=sf['path'], 
-											sfid=sf['sfID'] + self.sf_offset, 
+											sfid=sf['sfid'] + self.sf_offset, 
 											srcFileID=None, 
 											tratio=sf['tratio'], 
 											sfGrpID=sf['group'], 
 # 											reuseFlag=True, 
 # 											importFlag=importFlag, 
-											uflag=sf['unique_id'])
+											uflag=sf['uniqueid'])
 		for key in soundfiles:
 			sf = soundfiles[key]
-			#print key, ' | ', sf['parent_id']
-			#print type(key), ' || ', type(sf['parent_id'])
+			#print key, ' | ', sf['parentid']
+			#print type(key), ' || ', type(sf['parentid'])
 			try:
-				pid = sf['parent_id']
+				pid = sf['parentid']
 				
-				# params_with_dur = sf['params'] + ['dur', sf[ sf['parent_id'] ]]
+				# params_with_dur = sf['params'] + ['dur', sf[ sf['parentid'] ]]
 
-				#print key, ' | ', soundfiles[key]['sfid'], ' | ', soundfiles[key]['parent_id']
+				#print key, ' | ', soundfiles[key]['sfid'], ' | ', soundfiles[key]['parentid']
 				sfid = self.add_sound_file(filename=None, 
 												sfid=sf['sfid'] + self.sf_offset, 
 												srcFileID=pid + self.sf_offset, 
@@ -577,7 +577,7 @@ class CorpusDB:
 												sfGrpID=sf['group'],
 												synthdef=sf['synth'], 
 												params=sf['params'],
-												uflag=sf['unique_id'])
+												uflag=sf['uniqueid'])
 			except KeyError:
 				pass
 				#print 'Uh-oh'
@@ -614,12 +614,11 @@ class CorpusDB:
 		toplevel['soundfiletree'] = sf
 		# roll the cutable rows into dictionary
 		d = dict()
-# 		print 'keys: ', self.cutable.keys()
+		# print 'keys: ', self.cutable.keys()
 		for cid in self.cutable.keys():
-# 			print 'cutable entry: ', type(self.cutable[cid])
+			# print 'cutable entry: ', type(self.cutable[cid])
 			d[cid] = json.dumps(self.cutable[cid].tolist())
 		toplevel['corpusunits'] = d
 		
 		f.write(jsonpickle.encode(toplevel))	
 		f.close()
-	

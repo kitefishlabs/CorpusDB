@@ -142,6 +142,7 @@ class NRTOSCParser:
 			for prow in params:
 				rows.insert(-1,prow)
 		# rewrite the params in rows so that they have correct/logical values		
+		currBus = 10
 		for r, row in enumerate(rows):
 			for index, val in enumerate(row):
 				if val == 'srcbufNum':
@@ -168,6 +169,6 @@ class NRTOSCParser:
 		# pass the osc list to function that writes binary .osc file
 		self.processAndWriteFile(oscList, oscDir)
 		# always return pwd to the anchor dir
-		os.chdir(self.lib['anchor'])
+		os.chdir(self.anchor)
 
 

@@ -198,11 +198,11 @@ class SamplerNode(Node):
 			'synth' : self.synth,
 			'params' : self.params,
 			'duration' : self.duration,
-			'unique_id' : self.unique_id,
+			'uniqueid' : self.unique_id,
 			'channels' : self.channels,
 			'group' : self.group,
 			'tratio' : self.tratio,
-			'sfID' : self.sfid }
+			'sfid' : self.sfid }
 
 class EfxNode(Node):
 	"""
@@ -231,11 +231,11 @@ class EfxNode(Node):
 		"""
 	
 		"""
-		return { 'parent_id': self.parent_id,
+		return { 'parentid': self.parent_id,
 			'synth' : self.synth,
 			'params' : self.params,
 			'duration' : self.duration,
-			'unique_id' : self.unique_id,
+			'uniqueid' : self.unique_id,
 			'channels' : self.channels,
 			'group' : self.group,
 			'tratio' : self.tratio,
