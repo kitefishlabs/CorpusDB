@@ -2,6 +2,9 @@
 corpusdb/spdocs/_build
 build/*
 
+*/_
+*.md.wav
+*.osc
 
 # C extensions
 *.so

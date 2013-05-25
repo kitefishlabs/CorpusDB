@@ -39,129 +39,6 @@ import corpusdb
 import numpy as np
 from numpy import *
 
-	FOLDERS = ['scraped', 'bowed']
-	anchorpath = os.getcwd()
-
-	for folder in FOLDERS:
-		
-		snd_subdir = folder
-		sndpath = anchorpath + '/snd/' + snd_subdir
-		corpus = corpusdb.CorpusDB(anchorpath, sudo_flag=True)
-	
-		## iterate on all files in dir
-		for f in glob.glob( os.path.join(sndpath, '*.wav') ):
-		
-			for tval in [0.5,0.66667,0.75,0.8,1.0,1.25,1.33333,1.5,2.0]:
-
-	 			print '1. adding: ', os.path.basename(f), ' + ', tval
-				node = corpus.add_sound_file(filename=os.path.basename(f), sfid=None, srcFileID=None, tratio=tval, sfGrpID=0, subdir=snd_subdir)
-				sfid = node.sfid
-	 			print '2. sfid: ', sfid
-				
-				corpus.analyze_sound_file(os.path.basename(f), sfid, tratio=tval, subdir=snd_subdir)
-				powers, mfcccs, al, cl = corpus.get_raw_metadata(sfid)
-				
-				sfdur = (corpus.sftree.nodes[sfid].duration / tval)
-				cut_list = find_cut_points(powers, mfcccs)
-				print '3. sfdur: ', sfdur
-				print '4. cut list (length):  ', cut_list, ' (', len(cut_list), ')'
-						
-				pair_list = []
-				# cut_list is in frames!
-				if len(cut_list) == 1:
-					pair_list += [[(frm*25*0.001), sfdur]]
-				else:
-					for frm in cut_list:
-						pair_list += [[(frm*25*0.001), 0]]
-					print pair_list
-					pair_list[-1][1] = sfdur - pair_list[-1][0]
-					for i, pair in enumerate(pair_list[0:-1]):
-						pair_list[i][1] = pair_list[i+1][0] - pair_list[i][0]
-				
-				print '5. pair list: ', pair_list
-				
-				pair = pair_list[0]
-				corpus.add_sound_file_unit(sfid, onset=pair[0], dur=pair[1], tag=9) # tag first unit
-				if len(pair_list) == 2:
-					pair = pair_list[-1]
-					if pair[1] > 0:
-						sfid = corpus.add_sound_file_unit(sfid, onset=pair[0], dur=pair[1], tag=99) # tag first unit
-						print '6a. Adding a head sf-unit for a PARENT NODE with sfid: ', sfid, ', onset: ', pair[0], ', dur: ', pair[1], ' and tag 99.'
-				elif len(pair_list) > 2:
-					for i, pair in enumerate(pair_list[1:-1]):
-						sfid = corpus.add_sound_file_unit(sfid, onset=pair[0], dur=pair[1], tag=0)
-						print '6b. Adding a body sf-unit for a PARENT NODE with sfid: ', sfid, ', onset: ', pair[0], ', dur: ', pair[1], ' and tag 0.'
-					pair = pair_list[-1]
-					if pair[1] > 0:
-						sfid = corpus.add_sound_file_unit(sfid, onset=pair[0], dur=pair[1], tag=99) # tag first unit
-						print '6c. Adding a tail sf-unit for a PARENT NODE with sfid: ', sfid, ', onset: ', pair[0], ', dur: ', pair[1], ' and tag 99.'
-				
-				corpus.segment_units(sfid)
-				corpus._deactivate_raw_sound_file(sfid)
-				
-				param_pairs_list = [['combM', 'delay', 0.025, 'decay', 0.99, 'dur', sfdur],
-					['combM', 'delay', 0.02, 'decay', 0.99, 'dur', sfdur],
-					['magSmear', 'bins', 9, 'dur', sfdur],
-					['magSmear', 'bins', 99, 'dur', sfdur],
-					['partialSynth', 'transp', tval, 'start', 5, 'envDur', (sfdur*0.5), 'dur', sfdur],
-					['partialSynth', 'transp', tval, 'start', 25, 'envDur', (sfdur*0.5), 'dur', sfdur],
-					['xoverM', 'amp', 0.0005, 'smooth', 0.9, 'dur', sfdur],
-					['xoverM', 'amp', 0.005, 'smooth', 0.9, 'dur', sfdur]]
-
-				for param_pair in param_pairs_list:
-					child_node = corpus.add_sound_file(filename=None, 
-														sfid=None, 
-														srcFileID=sfid, 
-														tratio=tval, 
-														sfGrpID=0,
-														synthdef=[param_pair[0]], 
-														params=[(['inbus', 20, 'outbus', 21] + param_pair[1:])])
-					child_sfid = child_node.sfid
-					print 'CHILD SFID: ', child_sfid
-					corpus.analyze_sound_file(os.path.basename(f), child_sfid, tratio=tval, subdir=snd_subdir)
-					powers, mfcccs, al, cl = corpus.get_raw_metadata(sfid)
-					
-					sfdur = corpus.sftree.nodes[child_sfid].duration / tval
-					cut_list = find_cut_points(powers, mfcccs)
-					print '3. sfdur: ', sfdur
-					print '4. cut list (length):  ', cut_list, ' (', len(cut_list), ')'
-					
-					pair_list = []
-					# cut_list is in frames!
-					if len(cut_list) == 1:
-						pair_list += [[(frm*25*0.001), sfdur]]
-					else:
-						for t in cut_list:
-							pair_list += [[(t*25*0.001), 0]]
-						pair_list[-1][1] = sfdur - pair_list[-1][0]
-						for i, pair in enumerate(pair_list[0:-1]):
-							pair_list[i][1] = pair_list[i+1][0] - pair_list[i][0]
-					
-					print '5. pair list: ', pair_list
-					
-					pair = pair_list[0]
-
-					corpus.add_sound_file_unit(child_sfid, onset=pair[0], dur=pair[1], tag=9) # tag first unit
-					if len(pair_list) == 2:
-						pair = pair_list[-1]
-						if pair[1] > 0:
-							corpus.add_sound_file_unit(child_sfid, onset=pair[0], dur=pair[1], tag=99) # tag first unit
-							print '6a. Adding a head sf-unit for a EFX NODE with sfid: ', sfid, ', onset: ', pair[0], ', dur: ', pair[1], ' and tag 99.'
-					elif len(pair_list) > 2:
-						for i, pair in enumerate(pair_list[1:-1]):
-							corpus.add_sound_file_unit(child_sfid, onset=pair[0], dur=pair[1], tag=0)
-							print '6b. Adding a body sf-unit for a EFX NODE with sfid: ', sfid, ', onset: ', pair[0], ', dur: ', pair[1], ' and tag 0.'
-						pair = pair_list[-1]
-						if pair[1] > 0:
-							corpus.add_sound_file_unit(child_sfid, onset=pair[0], dur=pair[1], tag=99) # tag first unit
-							print '6c. Adding a tail sf-unit for a EFX NODE with sfid: ', sfid, ', onset: ', pair[0], ', dur: ', pair[1], ' and tag 99.'
-
-					corpus.segment_units(child_sfid)
-					corpus._deactivate_raw_sound_file(child_sfid)
-
-		# Now convert corpus to array form and save JSON file		
-		corpus_array = corpus.convert_corpus_to_array(map_flag=True)
-		corpus.export_corpus_to_json(anchorpath + '/json/biped-' + folder + '-exp24.json')
 
 def find_cut_points(raw_power, raw_mfccs):
 	"""
@@ -173,7 +50,7 @@ def find_cut_points(raw_power, raw_mfccs):
 	# diff along time axis
 	diffs = np.diff(raw_mfccs, axis=0)
 	# sum of abs. vals (of diffs) along data axis
-	sum = np.sum(np.abs(diffs, axis=1))
+	sum = np.sum(np.abs(diffs), axis=1)
 	# take the average
 	avg = np.mean(sum)
 	# find indices where sum is greater than the avg. of all sums (peaks) 
@@ -188,3 +65,129 @@ def find_cut_points(raw_power, raw_mfccs):
 		if (cpt - spaced[-1]) > 4: spaced += [cpt]
 	return spaced
 	
+
+
+FOLDERS = ['scraped', 'bowed']
+anchorpath = os.getcwd()
+
+for folder in FOLDERS:
+	
+	snd_subdir = folder
+	sndpath = anchorpath + '/snd/' + snd_subdir
+	corpus = corpusdb.CorpusDB(anchorpath, sudo_flag=True)
+
+	## iterate on all files in dir
+	for f in glob.glob( os.path.join(sndpath, '*.wav') ):
+	
+		for tval in [0.5,0.66667,0.75,0.8,1.0,1.25,1.33333,1.5,2.0]:
+
+			print '1. adding: ', os.path.basename(f), ' + ', tval
+			node = corpus.add_sound_file(filename=os.path.basename(f), sfid=None, srcFileID=None, tratio=tval, sfGrpID=0, subdir=snd_subdir)
+			sfid = node.sfid
+			print '2. sfid: ', sfid
+			
+			corpus.analyze_sound_file(os.path.basename(f), sfid, tratio=tval, subdir=snd_subdir)
+			powers, mfcccs, al, cl = corpus.get_raw_metadata(sfid)
+			
+			sfdur = (corpus.sftree.nodes[sfid].duration / tval)
+			cut_list = find_cut_points(powers, mfcccs)
+			print '3. sfdur: ', sfdur
+			print '4. cut list (length):  ', cut_list, ' (', len(cut_list), ')'
+					
+			pair_list = []
+			# cut_list is in frames!
+			if len(cut_list) == 1:
+				pair_list += [[(frm*25*0.001), sfdur]]
+			else:
+				for frm in cut_list:
+					pair_list += [[(frm*25*0.001), 0]]
+				print pair_list
+				pair_list[-1][1] = sfdur - pair_list[-1][0]
+				for i, pair in enumerate(pair_list[0:-1]):
+					pair_list[i][1] = pair_list[i+1][0] - pair_list[i][0]
+			
+			print '5. pair list: ', pair_list
+			
+			pair = pair_list[0]
+			corpus.add_sound_file_unit(sfid, onset=pair[0], dur=pair[1], tag=9) # tag first unit
+			if len(pair_list) == 2:
+				pair = pair_list[-1]
+				if pair[1] > 0:
+					sfid = corpus.add_sound_file_unit(sfid, onset=pair[0], dur=pair[1], tag=99) # tag first unit
+					print '6a. Adding a head sf-unit for a PARENT NODE with sfid: ', sfid, ', onset: ', pair[0], ', dur: ', pair[1], ' and tag 99.'
+			elif len(pair_list) > 2:
+				for i, pair in enumerate(pair_list[1:-1]):
+					sfid = corpus.add_sound_file_unit(sfid, onset=pair[0], dur=pair[1], tag=0)
+					print '6b. Adding a body sf-unit for a PARENT NODE with sfid: ', sfid, ', onset: ', pair[0], ', dur: ', pair[1], ' and tag 0.'
+				pair = pair_list[-1]
+				if pair[1] > 0:
+					sfid = corpus.add_sound_file_unit(sfid, onset=pair[0], dur=pair[1], tag=99) # tag first unit
+					print '6c. Adding a tail sf-unit for a PARENT NODE with sfid: ', sfid, ', onset: ', pair[0], ', dur: ', pair[1], ' and tag 99.'
+			
+			corpus.segment_units(sfid)
+			corpus._deactivate_raw_sound_file(sfid)
+			
+			param_pairs_list = [['combM', 'delay', 0.025, 'decay', 0.99, 'dur', sfdur],
+				['combM', 'delay', 0.02, 'decay', 0.99, 'dur', sfdur],
+				['magSmear', 'bins', 9, 'dur', sfdur],
+				['magSmear', 'bins', 99, 'dur', sfdur],
+				['partialSynth', 'transp', tval, 'start', 5, 'envDur', (sfdur*0.5), 'dur', sfdur],
+				['partialSynth', 'transp', tval, 'start', 25, 'envDur', (sfdur*0.5), 'dur', sfdur],
+				['xoverM', 'amp', 0.0005, 'smooth', 0.9, 'dur', sfdur],
+				['xoverM', 'amp', 0.005, 'smooth', 0.9, 'dur', sfdur]]
+
+			for param_pair in param_pairs_list:
+				child_node = corpus.add_sound_file(filename=None, 
+													sfid=None, 
+													srcFileID=sfid, 
+													tratio=tval, 
+													sfGrpID=0,
+													synthdef=[param_pair[0]], 
+													params=[(['inbus', 20, 'outbus', 21] + param_pair[1:])])
+				child_sfid = child_node.sfid
+				print 'CHILD SFID: ', child_sfid
+				corpus.analyze_sound_file(os.path.basename(f), child_sfid, tratio=tval, subdir=snd_subdir)
+				powers, mfcccs, al, cl = corpus.get_raw_metadata(sfid)
+				
+				sfdur = corpus.sftree.nodes[child_sfid].duration / tval
+				cut_list = find_cut_points(powers, mfcccs)
+				print '3. sfdur: ', sfdur
+				print '4. cut list (length):  ', cut_list, ' (', len(cut_list), ')'
+				
+				pair_list = []
+				# cut_list is in frames!
+				if len(cut_list) == 1:
+					pair_list += [[(frm*25*0.001), sfdur]]
+				else:
+					for t in cut_list:
+						pair_list += [[(t*25*0.001), 0]]
+					pair_list[-1][1] = sfdur - pair_list[-1][0]
+					for i, pair in enumerate(pair_list[0:-1]):
+						pair_list[i][1] = pair_list[i+1][0] - pair_list[i][0]
+				
+				print '5. pair list: ', pair_list
+				
+				pair = pair_list[0]
+
+				corpus.add_sound_file_unit(child_sfid, onset=pair[0], dur=pair[1], tag=9) # tag first unit
+				if len(pair_list) == 2:
+					pair = pair_list[-1]
+					if pair[1] > 0:
+						corpus.add_sound_file_unit(child_sfid, onset=pair[0], dur=pair[1], tag=99) # tag first unit
+						print '6a. Adding a head sf-unit for a EFX NODE with sfid: ', sfid, ', onset: ', pair[0], ', dur: ', pair[1], ' and tag 99.'
+				elif len(pair_list) > 2:
+					for i, pair in enumerate(pair_list[1:-1]):
+						corpus.add_sound_file_unit(child_sfid, onset=pair[0], dur=pair[1], tag=0)
+						print '6b. Adding a body sf-unit for a EFX NODE with sfid: ', sfid, ', onset: ', pair[0], ', dur: ', pair[1], ' and tag 0.'
+					pair = pair_list[-1]
+					if pair[1] > 0:
+						corpus.add_sound_file_unit(child_sfid, onset=pair[0], dur=pair[1], tag=99) # tag first unit
+						print '6c. Adding a tail sf-unit for a EFX NODE with sfid: ', sfid, ', onset: ', pair[0], ', dur: ', pair[1], ' and tag 99.'
+
+				corpus.segment_units(child_sfid)
+				corpus._deactivate_raw_sound_file(child_sfid)
+
+	# Now convert corpus to array form and save JSON file		
+	corpus_array = corpus.convert_corpus_to_array(map_flag=True)
+	corpus.export_corpus_to_json(anchorpath + '/json/biped-' + folder + '-exp24.json')
+
