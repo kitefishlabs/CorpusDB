@@ -528,7 +528,7 @@ class CorpusDB:
 	def cuids_for_sfid(self, seed_sfid):
 		return [int(self.cutable[entry][0]) for entry in self.cutable.keys() if self.cutable[entry][2] == seed_sfid]
 			
-	def import_corpus_from_json(self, jsonpath, appendflag=False, importflag=False):
+	def import_corpus_from_json(self, jsonfilename, appendflag=False, importflag=False):
 		"""
 		Create a corpus from a json file.
 		Append flag??? Should it be removed as a parameter.
@@ -542,6 +542,7 @@ class CorpusDB:
 			print 'sf_offset: ', self.sf_offset 			
 			
 		#set up
+		jsonpath = os.path.join(self.anchor, 'json', jsonfilename)
 		f = open(jsonpath, 'r')
 		j = json.load(f)
 		
@@ -553,13 +554,13 @@ class CorpusDB:
 				pkey = sf['parentID']
 			except KeyError:
 				sfid = self.add_sound_file(filename=sf['path'], 
-											sfid=sf['sfid'] + self.sf_offset, 
+											sfid=sf['sfID'] + self.sf_offset, 
 											srcFileID=None, 
-											tratio=sf['tratio'], 
+											tratio=sf['tRatio'], 
 											sfGrpID=sf['group'], 
 # 											reuseFlag=True, 
 # 											importFlag=importFlag, 
-											uflag=sf['uniqueid'])
+											uflag=sf['uniqueID'])
 		for key in soundfiles:
 			sf = soundfiles[key]
 			#print key, ' | ', sf['parentid']
@@ -571,25 +572,28 @@ class CorpusDB:
 
 				#print key, ' | ', soundfiles[key]['sfid'], ' | ', soundfiles[key]['parentid']
 				sfid = self.add_sound_file(filename=None, 
-												sfid=sf['sfid'] + self.sf_offset, 
+												sfid=sf['sfID'] + self.sf_offset, 
 												srcFileID=pid + self.sf_offset, 
-												tratio=sf['tratio'], 
+												tratio=sf['tRatio'], 
 												sfGrpID=sf['group'],
 												synthdef=sf['synth'], 
 												params=sf['params'],
-												uflag=sf['uniqueid'])
+												uflag=sf['uniqueID'])
 			except KeyError:
 				pass
 				#print 'Uh-oh'
 				
 		corpusunits = j['corpusunits']
 		for key in corpusunits:
-			# print '-----------------------'
-			# print int(key)
-			# print json.loads(corpusunits[key])
-			cunit = json.loads(corpusunits[key])
+# 			print '-----------------------'
+# 			print type(key)
+# 			print corpusunits[str(key)]
+			cunit = corpusunits[str(key)]
+			print "cunit: ", cunit
 			cunit[0] += self.cu_offset
+			print "cunit[0]: ", cunit[0]
 			cunit[2] += self.sf_offset
+			print "cunit[2]: ", cunit[2]
 			self.add_corpus_unit(int(key) + self.cu_offset, cunit)
 		
 		self.sf_offset = max(self.sftree.nodes.keys()) + 1
