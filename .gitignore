@@ -6,6 +6,8 @@ build/*
 *.md.wav
 *.osc
 
+*.pyc
+
 # C extensions
 *.so
 
