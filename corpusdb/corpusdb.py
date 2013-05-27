@@ -185,15 +185,19 @@ class CorpusDB:
     
 	def _deactivate_raw_sound_file(self, sfid):
 		"""
-		
+		Free all raw metadata associated with the given sf id.
 		"""
 		try:
 			del self.rawmaps[sfid]
+			del self.activation_layers[sfid]
+			del self.cooked_layers[sfid]
+			del self.powers[sfid]
+			del self.mfccs[sfid]
 		except KeyError:
-			print "Attempt to deactivate memmap for key ", sfid, " has failed."
+			print "Attempt to deactivate memmap or other metadata for key ", sfid, " has failed."
 			return None
 		return sfid
-		
+	
 	def analyze_sound_file(self, filename, sfid, group=0, tratio=1.0, subdir=None):
 		"""
 		Read NRT OSC score file, perform analysis asynchronously via shell, wait, signal completion and clean up.
