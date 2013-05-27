@@ -160,13 +160,15 @@ class CorpusDB:
 		print 'mdpath: ', mdpath
 		num_frames = pair[1]
 		try:
+# 			print "RAW MAPS SHAPE: ", self.rawmaps[sfid].shape
 			power_vector = self.rawmaps[sfid].T[0]
-			mfccs_vector = self.rawmaps[sfid].T[2:].T
+			mfccs_vector = self.rawmaps[sfid].T[1:].T
 		except KeyError:
 			#print "key errors are good..."
-			self.rawmaps[sfid] = np.memmap(mdpath, dtype=np.float32, mode='r', offset=280, shape=(num_frames, 24))
+			self.rawmaps[sfid] = np.memmap(mdpath, dtype=np.float32, mode='r', offset=272, shape=(num_frames, 25))
+			print "RAW MAPS SHAPE: ", self.rawmaps[sfid].shape
 			power_vector = self.rawmaps[sfid].T[0]
-			mfccs_vector = self.rawmaps[sfid].T[2:].T
+			mfccs_vector = self.rawmaps[sfid].T[1:].T
 		
 		interm = np.ma.masked_outside(mfccs_vector, 0.0, 1.0)
 		interm = np.ma.masked_invalid(interm)
@@ -174,8 +176,13 @@ class CorpusDB:
 		
 		self.activation_layers[sfid] = [1.0 for x in range(interm.shape[0])] # num rows in memmap
 		
-		self.cooked_layers[sfid] = [row for i, row in enumerate(interm) if self.activation_layers[sfid][i] > 0.5]
+		self.cooked_layers[sfid] = np.array([], dtype='float32')
 		
+		for i, row in enumerate(interm):
+			if self.activation_layers[sfid][i] > 0.5:
+				self.cooked_layers[sfid] = np.append(np.atleast_2d(self.cooked_layers[sfid]), row[:])
+			else:
+				self.cooked_layers[sfid] = np.append(np.atleast_2d(self.cooked_layers[sfid]), np.zeros(24))
 		self.powers[sfid] = power_vector
 		self.mfccs[sfid] = mfccs_vector
 		
