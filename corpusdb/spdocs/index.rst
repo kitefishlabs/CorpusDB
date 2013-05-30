@@ -31,12 +31,17 @@ Dependencies
 * `SuperCollider <http:supercollider.sourceforge.net>`_
 * Download `sc3-plugins <http://sourceforge.net/projects/sc3-plugins/files/OSX_3.6/SC3ExtPlugins-universal.dmg/download>`_ and install.
 * jsonpickle - `pypi.python.org/pypi/jsonpickle <http://pypi.python.org/pypi/jsonpickle>`_.
-* `Scipy Superpack <https://github.com/fonnesbeck/ScipySuperpack>`_ - technically, only numpy is required, but the Superpack is the way to go
+* `Scipy Superpack <https://github.com/fonnesbeck/ScipySuperpack>`_ 
 
 Optional, but highly recommended
 --------------------------------
 * `Bregman MIR Toolkit <http://digitalmusics.dartmouth.edu/bregman/>`_.
-* SC-0.3.1 - `pypi.python.org/pypi/SC/0.3.1 <http://pypi.python.org/pypi/SC/0.3.1>`_. - not used in the core classes, but needed to play sounds in real time when accessing a database.
+* SC-0.3.1 - `pypi.python.org/pypi/SC/0.3.1 <http://pypi.python.org/pypi/SC/0.3.1>`_. - not used in the core classes, but can be used to play sounds in real time.
+
+MacPorts
+--------
+
+You may also wish to use MacPorts' Python. Use Python 2.7, and get numpy, matplotlib, scipy, ipython, etc. Be sure to select the proper version of python, then install the optional libraries.
 
 
 Installation
@@ -56,7 +61,7 @@ CorpusDB Modules
    :maxdepth: 2
 
    corpusdb - database of sound files and metadata <corpusdb>
-   <sftree - representation of sounds and processed versions as nodes in tree <sftree>
+   sftree - representation of sounds and processed versions as nodes in tree <sftree>
    nrtoscparser - convert synth parameters into non-realtime (NRT) synthesis .osc files <nrtoscparser>
 
 Indices and tables
