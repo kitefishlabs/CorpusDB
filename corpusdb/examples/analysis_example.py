@@ -65,6 +65,7 @@ def find_cut_points(raw_power, raw_mfccs):
 		if (cpt - spaced[-1]) > 4: spaced += [cpt]
 	return spaced
 	
+	
 
 
 FOLDERS = ['scraped', 'bowed']

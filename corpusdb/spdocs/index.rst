@@ -20,10 +20,10 @@ There are some great tools out there for MIR, and also for corpus-based concaten
 * Composition - organizing sound files for systematic material generation or transformation
 * Analysis - can be used to support purely analytical tasks.
 * Synthesis - sounds can be synthesized directly rather than sampled
-* Trees/Nodes - structure allows for relationships between source sounds and derivations
-* Interoperability - data can be easily processed and displayed with Numpy, Bregman and other tools
+* Trees/Nodes - structure allows for relationships between source sounds and processed sounds
+* Interoperability - data can be easily processed and displayed with Numpy, Matplotlib, Bregman and other tools
 * Generative - serves as a perfect tool for tracking and representing sounds and sound-making algorithms in a generative system
-* CBPSC - the sclang companion project to CorpusDB; to be kept synced with CorpusDB for complete interoperability.
+* CBPSC - sclang companion project to CorpusDB; will be kept synced with CorpusDB for complete interoperability.
 
 Dependencies
 ============
@@ -53,7 +53,13 @@ If you do not have admin (sudo) privileges, you can install in your home path us
 
 Tutorials
 =========
-TBA
+.. toctree::
+   :maxdepth: 2
+
+	1. Simple Analysis - demo of CorpusDB used for corpus analysis/organization <1_simple_analysis>
+	2. Subcorpora - demo of subsets of corpora <2_subcorpora>
+	3. Parent-child relationships - representation of parent-child relationships allow for tracking sounds and their transformations <3_parent_child_relationships>
+	4. Visualization - visualization of corpus data using Matplotlob and Numpy <4_visualization>
 
 CorpusDB Modules
 ================
