@@ -72,8 +72,8 @@ class CorpusDB:
 		self.rawmaps = dict()
 		self.powers = dict()
 		self.mfccs = dict()
-		self.activation_layers = dict()
-		self.cooked_layers = dict()
+# 		self.activation_layers = dict()
+# 		self.cooked_layers = dict()
 		# corpus-level mappings and helper data structures
 		self.sfmap = dict()
 		self.sfgmap = dict()
@@ -170,25 +170,26 @@ class CorpusDB:
 			power_vector = self.rawmaps[sfid].T[0]
 			mfccs_vector = self.rawmaps[sfid].T[1:].T
 		
-		interm = np.ma.masked_outside(mfccs_vector, 0.0, 1.0)
-		interm = np.ma.masked_invalid(interm)
-		interm = interm.filled(interm.mean())
+# 		interm = np.ma.masked_invalid(mfccs_vector)
+# 		interm = interm.filled(interm.mean())
 		
-		self.activation_layers[sfid] = [1.0 for x in range(interm.shape[0])] # num rows in memmap
+# 		self.activation_layers[sfid] = np.zeros(self.rawmaps[sfid].shape[0])
+# 		gte = np.argwhere(power_vector>=0.00001)
+# 		self.activation_layers[sfid][gte] = 1
+# 		
+# 		self.cooked_layers[sfid] = mfccs_vector[sfid][:]
 		
-		self.cooked_layers[sfid] = np.array([], dtype='float32')
-		
-		for i, row in enumerate(interm):
-			if self.activation_layers[sfid][i] > 0.5:
-				self.cooked_layers[sfid] = np.append(np.atleast_2d(self.cooked_layers[sfid]), row[:])
-			else:
-				self.cooked_layers[sfid] = np.append(np.atleast_2d(self.cooked_layers[sfid]), np.zeros(24))
+# 		for i, row in enumerate(interm):
+# 			if self.activation_layers[sfid][i] > 0.5:
+# 				self.cooked_layers[sfid] = np.append(np.atleast_2d(self.cooked_layers[sfid]), row[:])
+# 			else:
+# 				self.cooked_layers[sfid] = np.append(np.atleast_2d(self.cooked_layers[sfid]), np.zeros(24))
 		self.powers[sfid] = power_vector
 		self.mfccs[sfid] = mfccs_vector
 		
-		del interm
+# 		del interm
 		
-		return self.powers[sfid], self.mfccs[sfid], self.activation_layers[sfid], self.cooked_layers[sfid]
+		return self.powers[sfid], self.mfccs[sfid] #, self.activation_layers[sfid], self.cooked_layers[sfid]
     
 	def _deactivate_raw_sound_file(self, sfid):
 		"""
@@ -196,8 +197,8 @@ class CorpusDB:
 		"""
 		try:
 			del self.rawmaps[sfid]
-			del self.activation_layers[sfid]
-			del self.cooked_layers[sfid]
+# 			del self.activation_layers[sfid]
+# 			del self.cooked_layers[sfid]
 			del self.powers[sfid]
 			del self.mfccs[sfid]
 		except KeyError:
@@ -352,7 +353,7 @@ class CorpusDB:
 		Note that this function is only going to work when there is raw analyzed metadata. To get the segmentsed
 		"""
 		try:
-			return self.powers[sfid], self.mfccs[sfid], self.activation_layers[sfid], self.cooked_layers[sfid]
+			return self.powers[sfid], self.mfccs[sfid] #, self.activation_layers[sfid], self.cooked_layers[sfid]
 		except KeyError:
 			return self._activate_raw_metadata(sfid) # now self.rawmaps[sfid] should exist or res == None if not
 	
@@ -372,7 +373,7 @@ class CorpusDB:
 		
 		"""
 		segmented = self.get_sorted_units_list(sfid)
-		raw_amps, raw_mfccs, activation, cooked = self._activate_raw_metadata(sfid)
+		raw_amps, raw_mfccs = self._activate_raw_metadata(sfid)
 		amps , reheated = [], []
 		
 # 		print 'raw: ', raw_amps
@@ -555,7 +556,9 @@ class CorpusDB:
 		#set up
 		jsonpath = os.path.join(self.anchor, 'json', jsonfilename)
 		f = open(jsonpath, 'r')
-		j = json.load(f)
+		
+		# j = json.load(f)
+		j = jsonpickle.decode(f.read())
 		
 		soundfiles = j['soundfiletree']
 		for key in soundfiles:
@@ -600,7 +603,9 @@ class CorpusDB:
 # 			print type(key)
 # 			print corpusunits[str(key)]
 			cunit = corpusunits[str(key)]
+			cunit = [float(x) for x in cunit.strip('[]').split(',')]
 			print "cunit: ", cunit
+			print "cunit type: ", type(cunit[2])
 			cunit[0] += self.cu_offset
 			print "cunit[0]: ", cunit[0]
 			cunit[2] += self.sf_offset
@@ -615,11 +620,11 @@ class CorpusDB:
 		f.close()
 		
 	
-	def export_corpus_to_json(self, jsonpath):
+	def export_corpus_to_json(self, jsonfilename):
 		"""
 		
 		"""
-		
+		jsonpath = os.path.join(self.anchor, 'json', jsonfilename)		
 		f = open(jsonpath, 'w')
 		# don't forget the descriptors...
 		toplevel = { 'descriptors': self.dtable }
