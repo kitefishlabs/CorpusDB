@@ -68,19 +68,19 @@ def find_cut_points(raw_power, raw_mfccs):
 	
 
 
-FOLDERS = ['scraped', 'bowed']
-anchorpath = os.getcwd()
+FOLDERS = ['scraped', 'bowed'] # these are folders in the snd directory
+anchorpath = os.getcwd() # lets assume that we are executing the script from the corpus' dir
 
-for folder in FOLDERS:
+for snd_subdir in FOLDERS:
 	
-	snd_subdir = folder
-	sndpath = anchorpath + '/snd/' + snd_subdir
-	corpus = corpusdb.CorpusDB(anchorpath, sudo_flag=True)
+	sndpath = os.path.join(anchorpath, 'snd', snd_subdir)
+	print 'sndpath: ', sndpath
+	corpus = corpusdb.CorpusDB(anchorpath)
 
 	## iterate on all files in dir
 	for f in glob.glob( os.path.join(sndpath, '*.wav') ):
 	
-		for tval in [0.5,0.66667,0.75,0.8,1.0,1.25,1.33333,1.5,2.0]:
+		for tval in [0.5, 1.0, 2.0]:
 
 			print '1. adding: ', os.path.basename(f), ' + ', tval
 			node = corpus.add_sound_file(filename=os.path.basename(f), sfid=None, srcFileID=None, tratio=tval, sfGrpID=0, subdir=snd_subdir)
@@ -88,7 +88,7 @@ for folder in FOLDERS:
 			print '2. sfid: ', sfid
 			
 			corpus.analyze_sound_file(os.path.basename(f), sfid, tratio=tval, subdir=snd_subdir)
-			powers, mfcccs, al, cl = corpus.get_raw_metadata(sfid)
+			powers, mfcccs = corpus.get_raw_metadata(sfid)
 			
 			sfdur = (corpus.sftree.nodes[sfid].duration / tval)
 			cut_list = find_cut_points(powers, mfcccs)
@@ -98,10 +98,10 @@ for folder in FOLDERS:
 			pair_list = []
 			# cut_list is in frames!
 			if len(cut_list) == 1:
-				pair_list += [[(frm*25*0.001), sfdur]]
+				pair_list += [[(frm*0.04), sfdur]]
 			else:
 				for frm in cut_list:
-					pair_list += [[(frm*25*0.001), 0]]
+					pair_list += [[(frm*0.04), 0]]
 				print pair_list
 				pair_list[-1][1] = sfdur - pair_list[-1][0]
 				for i, pair in enumerate(pair_list[0:-1]):
@@ -148,7 +148,7 @@ for folder in FOLDERS:
 				child_sfid = child_node.sfid
 				print 'CHILD SFID: ', child_sfid
 				corpus.analyze_sound_file(os.path.basename(f), child_sfid, tratio=tval, subdir=snd_subdir)
-				powers, mfcccs, al, cl = corpus.get_raw_metadata(sfid)
+				powers, mfcccs = corpus.get_raw_metadata(sfid)
 				
 				sfdur = corpus.sftree.nodes[child_sfid].duration / tval
 				cut_list = find_cut_points(powers, mfcccs)
@@ -158,10 +158,11 @@ for folder in FOLDERS:
 				pair_list = []
 				# cut_list is in frames!
 				if len(cut_list) == 1:
-					pair_list += [[(frm*25*0.001), sfdur]]
+					pair_list += [[(frm*0.04), sfdur]]
 				else:
-					for t in cut_list:
-						pair_list += [[(t*25*0.001), 0]]
+					for frm in cut_list:
+						pair_list += [[(frm*0.04), 0]]
+					print pair_list
 					pair_list[-1][1] = sfdur - pair_list[-1][0]
 					for i, pair in enumerate(pair_list[0:-1]):
 						pair_list[i][1] = pair_list[i+1][0] - pair_list[i][0]
@@ -190,5 +191,5 @@ for folder in FOLDERS:
 
 	# Now convert corpus to array form and save JSON file		
 	corpus_array = corpus.convert_corpus_to_array(map_flag=True)
-	corpus.export_corpus_to_json(anchorpath + '/json/biped-' + folder + '-exp24.json')
+	corpus.export_corpus_to_json(anchorpath + '/json/biped-' + snd_subdir + '-exp24.json')
 
