@@ -603,7 +603,10 @@ class CorpusDB:
 # 			print type(key)
 # 			print corpusunits[str(key)]
 			cunit = corpusunits[str(key)]
-			cunit = [float(x) for x in cunit.strip('[]').split(',')]
+			try:
+				cunit = [float(x) for x in cunit.strip('[]').split(',')]
+			except AttributeError:
+				cunit = corpusunits[str(key)]
 			print "cunit: ", cunit
 			print "cunit type: ", type(cunit[2])
 			cunit[0] += self.cu_offset
