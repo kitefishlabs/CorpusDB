@@ -580,7 +580,7 @@ class CorpusDB:
 			#print key, ' | ', sf['parentid']
 			#print type(key), ' || ', type(sf['parentid'])
 			try:
-				pid = sf['parentid']
+				pid = sf['parentID']
 				
 				# params_with_dur = sf['params'] + ['dur', sf[ sf['parentid'] ]]
 
