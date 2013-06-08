@@ -534,7 +534,7 @@ class CorpusDB:
 		filtered_by_tag = np.reshape(filtered_by_tag, (indices.shape[0], filtered_by_type.shape[1]))
 
 		# add indices as a column (on the left)
-		return np.append(filtered_by_tag, indices, axis=1)
+		return np.append(indices, filtered_by_tag, axis=1)
 		
 	
 	def cuids_for_sfid(self, seed_sfid):
