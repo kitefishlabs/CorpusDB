@@ -178,7 +178,7 @@ class SamplerNode(Node):
 		except AttributeError:
 			print 'Atrribute Error in superclass init'
 		self.sfpath = sfpath
-		self.hashstring = str(self.synth[0]) + ("%.5f" % self.tratio)
+		self.hashstring = str(self.synth) + ("%.5f" % self.tratio)
 		self.verify_sf()
 
 	def __repr__(self):
@@ -223,7 +223,7 @@ class EfxNode(Node):
 		self.hashstring = str(self.synth[0])
 		pdict = dict(zip([str(x) for x in self.params[0][0::2]], self.params[0][1::2]))
 		for k in pdict:
-			if (k != 'outbus') and (k != 'inbus') and (k != 'dur'):
+			if (k != 'outbus') and (k != 'inbus') and (k != 'dur') and (k != 'envDur') and (k != 'transp'):
 				self.hashstring += k
 				if type(pdict[k]) == type(1.2):
 					self.hashstring += str("%.5f" % pdict[k])
