@@ -120,6 +120,7 @@ class Node:
 		self.unit_mfccs = dict()
 		self.verify_synthname_and_params()
 
+
 	def verify_synthname_and_params(self):
 		"""
 	
@@ -177,6 +178,7 @@ class SamplerNode(Node):
 		except AttributeError:
 			print 'Atrribute Error in superclass init'
 		self.sfpath = sfpath
+		self.hashstring = str(self.synth[0]) + ("%.5f" % self.tratio)
 		self.verify_sf()
 
 	def __repr__(self):
@@ -202,7 +204,8 @@ class SamplerNode(Node):
 			'channels' : self.channels,
 			'group' : self.group,
 			'tRatio' : self.tratio,
-			'sfID' : self.sfid }
+			'sfID' : self.sfid,
+			'hash' : self.hashstring }
 
 class EfxNode(Node):
 	"""
@@ -217,6 +220,16 @@ class EfxNode(Node):
 		except AttributeError:
 			print 'Atrribute Error in superclass init'
 		self.parent_id = parentID
+		self.hashstring = str(self.synth[0]) + ("%.5f" % self.tratio)
+		pdict = dict(zip([str(x) for x in self.params[0][0::2]], self.params[0][1::2]))
+		for k in pdict:
+			if (k != 'outbus') and (k != 'inbus') and (k != 'dur'):
+				self.hashstring += k
+				if type(pdict[k]) == type(1.2):
+					self.hashstring += str("%.5f" % pdict[k])
+				else:
+					self.hashstring += str(pdict[k])
+		
 	
 	def __repr__(self):
 		"""
@@ -239,7 +252,8 @@ class EfxNode(Node):
 			'channels' : self.channels,
 			'group' : self.group,
 			'tRatio' : self.tratio,
-			'sfID' : self.sfid }
+			'sfID' : self.sfid,
+			'hash' : self.hashstring }
 
 class SynthNode(Node):
 	def __init__(self, synthname, params):
