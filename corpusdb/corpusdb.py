@@ -511,12 +511,12 @@ class CorpusDB:
 		X = np.array(xlist, dtype='float32')
 		X = np.reshape(X, (-1, num_descriptors))
 		
-		if type is 'I':		return X[:,:8]
-		elif type is 'A': 	return X[:,8:13]
-		elif type is 'M':	return X[:,13:]
-		elif type is 'all':	return X
+		if type is 'I':		return np.c_[X[:,0], X[:,:8]]
+		elif type is 'A': 	return np.c_[X[:,0], X[:,8:13]]
+		elif type is 'M':	return np.c_[X[:,0], X[:,13:]]
+		elif type is 'all':	return np.c_[X[:,0], X]
 		else:				raise ArgumentError
-
+	
 	def convert_corpus_to_tagged_array(self, type='all', tag=0.0, map_flag=False):
 		"""
 		Convert the corpus unit table to a three compacted arrays: power metadata and MFCC metadata.
@@ -525,7 +525,7 @@ class CorpusDB:
 		# get the info segments and filter those that are tagged
 		info = self.convert_corpus_to_array('I', map_flag)
 		
-		indices = np.argwhere(info[:,7]==tag)
+		indices = np.argwhere(info[:,8]==tag)
 # 		indices = np.reshape(indices, (indices.shape[0],))
 
 		# use the tagged indices to pull out the tagged entries
@@ -534,8 +534,8 @@ class CorpusDB:
 		filtered_by_tag = np.reshape(filtered_by_tag, (indices.shape[0], filtered_by_type.shape[1]))
 
 		# add indices as a column (on the left)
-		return np.append(indices, filtered_by_tag, axis=1)
-		
+# 		return np.append(indices, filtered_by_tag, axis=1)
+		return filtered_by_tag
 	
 	def cuids_for_sfid(self, seed_sfid):
 		return [int(self.cutable[entry][0]) for entry in self.cutable.keys() if self.cutable[entry][2] == seed_sfid]
