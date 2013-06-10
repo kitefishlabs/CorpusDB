@@ -640,6 +640,7 @@ class CorpusDB:
 		# print 'keys: ', self.cutable.keys()
 		for cid in self.cutable.keys():
 			# print 'cutable entry: ', type(self.cutable[cid])
+# 			clist = [("%.5f" % c) if (type(c) == type(1.1)) else str(c) for c in self.cutable[cid].tolist() ]
 			d[cid] = json.dumps(self.cutable[cid].tolist())
 		toplevel['corpusunits'] = d
 		
