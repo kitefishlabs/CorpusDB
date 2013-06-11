@@ -121,13 +121,13 @@ class CorpusDB:
 		"""
 	
 		"""
-		pass
+		return NotImplementedError
 	
 	def importSoundFileToBuffer(self, path, sfid):
 		"""
 	
 		"""
-		pass
+		return NotImplementedError
 	
 	def map_raw_sound_file(self, path, sfid, frames):
 		"""
