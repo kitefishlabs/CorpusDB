@@ -15,9 +15,9 @@ This system works with the following work flow:
 # Store units.
 # [Repeat steps 1-4 for additional audio files]
 # Export corpus to JSON file.
-# Use metadata for matching, similarity, etc. algorithms.
+# Use metadata for matching, similarity, etc. algorithms. 
 
-Every sound file incorporated in a corpus is stored according to the Synthdefs that produce it. This way, a sound file and the chain of processing stages that modify said sound are represented. This is a simple form of data compression. Once analyzed, metadata produced by the analysis are stored in a table. An index links the metadata to the sound-recording-plus-processing recipe.
+Metadata are mapped to units which represent segments of audio. Every sound file incorporated in a corpus is stored according to the Synthdefs that produce it. This way, a sound file and the chain of processing stages that modify said sound are represented. This is a simple form of data compression. Once analyzed, metadata produced by the analysis are stored in a table. An index links the metadata to the sound-recording-plus-processing recipe.
 
 Analytical tasks and compositional processes are built on top of this structured representation of sounds. The user is free to use the data as he/she wishes.
 
@@ -75,8 +75,6 @@ class CorpusDB:
 # 		self.activation_layers = dict()
 # 		self.cooked_layers = dict()
 		# corpus-level mappings and helper data structures
-		self.sfmap = dict()
-		self.sfgmap = dict()
 		self.tagmap = dict()
 		self.transformations = dict({0: 'thru', 'thru': 0})
 		self.synthdefs = dict()
@@ -214,13 +212,13 @@ class CorpusDB:
 		try:
 			synthid = self.sftree.nodes[sfid].parent_id
 # 			print "=== ", synthid
-			efx_synth = self.sftree.trackbacks[sfid][0]
-			efx_params = self.sftree.trackbacks[sfid][1]
+			efx_synth = self.sftree.sfmap[sfid][0]
+			efx_params = self.sftree.sfmap[sfid][1]
 		except AttributeError:
 			synthid = sfid
 			efx_synth = None
 			efx_params = None
-		# print "### ", synthid, '\n', self.sftree.trackbacks[sfid][0], '\n', self.sftree.trackbacks[sfid][1]
+		# print "### ", synthid, '\n', self.sftree.sfmap[sfid][0], '\n', self.sftree.sfmap[sfid][1]
 		self.parser.createNRTScore(fullpath, 
 									tratio=tratio, 
 									duration=self.sftree.nodes[sfid].duration, 
@@ -247,7 +245,7 @@ class CorpusDB:
 			print 'num frames: ', num_frames
 			# map it:
 			self.map_raw_sound_file(mdpath, sfid, num_frames)
-			## sftrees/trackbacks: handled in add_sound_file()!
+			## sftrees/sfmap: handled in add_sound_file()!
 			## what to do if returncode != 1 ???
 		else:
 			print 'Analysis was not successful; failed to map raw sound file!!!'
@@ -263,17 +261,8 @@ class CorpusDB:
 			self.sf_offset += 1
 			id = self.sf_offset
 		#print "sfgmap val: ", self.sfgmap[sfgroup]
-		try:
-			#self.sfgmap[sfgroup]
-			self.sfgmap[sfgroup].add(id)
-		except KeyError:
-			self.sfgmap[sfgroup] = set([id])
-		try: # (self.sfmap[sfid] is not None) and (self.sfmap[path] is not None):
-			self.sfmap[sfid] = path
-			self.sfmap[path] = sfid
-		except KeyError:
-			print 'This sfid <-> path mapping has already been made.'
-			return None
+
+		self.sftree.map_soundfile_to_group(sfid, sfgroup)
 	
 	
 	def add_sound_file_unit(self, sfid, path=None, onset=0, dur=0, tag=0):

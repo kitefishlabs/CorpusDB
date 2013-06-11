@@ -12,7 +12,7 @@ etc.
 
 __version__ = '1.0'
 __author__ = 'Thomas Stoll'
-__copyright__ = "Copyright (C) 2012, Thomas Stoll, All Rights Reserved"
+__copyright__ = "Copyright (C) 2012-13, Thomas Stoll, All Rights Reserved"
 __license__ = "gpl 3.0 or higher"
 __email__ = 'tms@kitefishlabs.com'
 
@@ -26,12 +26,16 @@ class SFTree:
 		self.corpus = crps
 		self.anchorPath = path
 		self.nodes = dict()
-		self.trackbacks = dict()
-		
-#	def checkForDuplicateNodes(self, nodename):
-#		for i,pair in enumerate(self.nodes.iteritems()):
-#			if p[1].synth == nodename
-
+		self.sfmap = dict()
+		self.sfgmap = dict()
+			
+	def map_soundfile_to_group(self, sfid, sfgroup):
+		try:
+			self.sfgmap[sfgroup].add(sfid)
+		except KeyError:
+			self.sfgmap[sfgroup] = set([sfid])
+		return self.sfgmap[sfgroup]
+	
 	def add_root_node(self, filename, sfID, tratio, sfg, snd_subdir=None, uniqueFlag=None):
 		"""
 		
@@ -62,7 +66,7 @@ class SFTree:
 			
 			# secondary mappings
 			self.corpus.map_id_to_sf(joined_path, sfID, sfg)
-			self.trackbacks[sfID] = [joined_path, dur, tratio, synthdef] # a more compact representation
+			self.sfmap[sfID] = [joined_path, dur, tratio, synthdef] # a more compact representation
 		
 #			return joined_path, sfg, tratio
 			return self.nodes[sfID]
@@ -91,7 +95,7 @@ class SFTree:
 
 			# secondary mappings
 			self.corpus.map_id_to_sf(self.nodes[parentID].sfpath, childID, sfg)
-			self.trackbacks[childID] = [synthdef, params]
+			self.sfmap[childID] = [synthdef, params]
 			
 #			return childID, sfg, tratio
 			return self.nodes[self.nodes[childID].sfid]
@@ -185,7 +189,7 @@ class SamplerNode(Node):
 		"""
 	
 		"""
-		return "Sampler Node: %s (duration: %.2f)"%(self.sfpath, self.duration)
+		return "Sampler Node: %s (duration: %.2f, transp: %.4f)"%(self.sfpath, self.duration, self.tratio)
 
 	def verify_sf(self):
 		# check that sfpath is a string
@@ -235,7 +239,7 @@ class EfxNode(Node):
 		"""
 	
 		"""
-		return "EFX Node: %s (parent id: %i)"%(self.synth, self.parent_id)
+		return "EFX Node: %s (parent id: %i, params: %s)"%(self.synth, self.parent_id, str(self.params))
 
 	def verify_synthname_and_params(self):
 		pass
