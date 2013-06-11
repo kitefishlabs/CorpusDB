@@ -92,9 +92,6 @@ class CorpusDB:
 		Add a sound file to the corpus. Either a filename or an sfid must be provided.
 		"""
 		# check for duplicate entries having same sndfile and tratio ???
-		#print 'srcfile?: ', srcFileID
-		#print 'path?: ', filename
-		#print 'sfid?: ', sfid
 
 		if sfid is None:
 			#NEED A MUCH BETTER ALGORITHM HERE! search for lowest unused sfid!
@@ -107,15 +104,6 @@ class CorpusDB:
 			root_node = self.sftree.add_root_node(filename, sfid, tratio, sfGrpID, snd_subdir=subdir, uniqueFlag=uflag)
 			print "add_root_node res: ", root_node.sfpath, ', ', root_node.sfid, ', ', root_node.group, ', ', root_node.tratio
 			
-# 			print "reuse flag: ", reuseFlag
-# 			if reuseFlag:
-# 				fname = string.split(os.path.basename( os.path.abspath(root_node.sfpath) ), '.')
-# 				cwd = os.path.dirname( os.path.abspath(root_node.sfpath) )
-# 				mdpath = cwd + "/md/" + fname[0] + '_' + `root_node.tratio` + '.md.' + fname[1]
-# 				print 'MDPATH for REUSE: ', mdpath
-# 				num_frames = math.ceil(self.sftree.nodes[sfid].duration / self.HOP_SECS / root_node.tratio)
-# 				#print 'num_frames for REUSE: ', num_frames
-# 				self.map_raw_sound_file(mdpath, sfid, num_frames)
 			return root_node
 			
 			# print "import flag: ", importFlag, 
@@ -572,7 +560,6 @@ class CorpusDB:
 											srcFileID=None, 
 											tratio=sf['tRatio'], 
 											sfGrpID=sf['group'], 
-# 											reuseFlag=True, 
 # 											importFlag=importFlag, 
 											uflag=sf['uniqueID'])
 		for key in soundfiles:
