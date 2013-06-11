@@ -428,11 +428,12 @@ class CorpusDB:
 			self.cutable[k] = None
 	
 	# test me
-	def _lookup_sfid(self, path):
+	def _lookup_sfid(self, path, transp):
 		"""
 		Look up id by querying path in sfmap table.
 		"""
 		try:
+			
 			sfid = self.sfmap[path]
 		except KeyError:
 			print 'Error: there is no entry for ', path, ' in the sf map. Lookup SFID failed.'
@@ -557,7 +558,6 @@ class CorpusDB:
 		jsonpath = os.path.join(self.anchor, 'json', jsonfilename)
 		f = open(jsonpath, 'r')
 		
-		# j = json.load(f)
 		j = jsonpickle.decode(f.read())
 		
 		soundfiles = j['soundfiletree']
@@ -567,7 +567,7 @@ class CorpusDB:
 			try:
 				pkey = sf['parentID']
 			except KeyError:
-				sfid = self.add_sound_file(filename=sf['path'], 
+				sfid = self.add_sound_file(filename=str(sf['path']), 
 											sfid=sf['sfID'] + self.sf_offset, 
 											srcFileID=None, 
 											tratio=sf['tRatio'], 
@@ -582,16 +582,20 @@ class CorpusDB:
 			try:
 				pid = sf['parentID']
 				
+				print ">>> params: ", sf['params']
+				params = [str(p) if (type(p) == type(u'')) else p for p in sf['params'][0]]
+				print ">>> params: ", params
+				
 				# params_with_dur = sf['params'] + ['dur', sf[ sf['parentid'] ]]
 
 				#print key, ' | ', soundfiles[key]['sfid'], ' | ', soundfiles[key]['parentid']
 				sfid = self.add_sound_file(filename=None, 
-												sfid=sf['sfID'] + self.sf_offset, 
-												srcFileID=pid + self.sf_offset, 
+												sfid=(sf['sfID'] + self.sf_offset), 
+												srcFileID=(pid + self.sf_offset), 
 												tratio=sf['tRatio'], 
-												sfGrpID=sf['group'],
-												synthdef=sf['synth'], 
-												params=sf['params'],
+												sfGrpID=sf['group'], 
+												synthdef=str(sf['synth'][0]), 
+												params=params,
 												uflag=sf['uniqueID'])
 			except KeyError:
 				pass
