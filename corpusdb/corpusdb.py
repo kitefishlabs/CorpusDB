@@ -91,7 +91,7 @@ class CorpusDB:
 			self.sf_offset = sfid + 1
 
 		if srcFileID is None:
-
+			
 			#pth, grp, tratio
 			root_node = self.sftree.add_root_node(filename, sfid, tratio, sfGrpID, snd_subdir=subdir, uniqueFlag=uflag)
 			print "add_root_node res: ", root_node.sfpath, ', ', root_node.sfid, ', ', root_node.group, ', ', root_node.tratio
@@ -535,6 +535,9 @@ class CorpusDB:
 		
 		j = jsonpickle.decode(f.read())
 		
+		self.anchor = str(j['anchorpath'])
+		# warn user if conflicting anchor path?
+		
 		soundfiles = j['soundfiletree']
 		for key in soundfiles:
 			sf = soundfiles[key]
@@ -542,7 +545,7 @@ class CorpusDB:
 			try:
 				pkey = sf['parentID']
 			except KeyError:
-				sfid = self.add_sound_file(filename=str(sf['path']), 
+				sfid = self.add_sound_file(filename=str(sf['relpath']), 
 											sfid=sf['sfID'] + self.sf_offset, 
 											srcFileID=None, 
 											tratio=sf['tRatio'], 
@@ -608,7 +611,7 @@ class CorpusDB:
 		jsonpath = os.path.join(self.anchor, 'json', jsonfilename)		
 		f = open(jsonpath, 'w')
 		# don't forget the descriptors...
-		toplevel = { 'descriptors': self.dtable }
+		toplevel = { 'descriptors': self.dtable, 'anchorpath': self.anchor }
 		sf = dict()
 		for sfid in self.sftree.nodes.keys():
 			sf[sfid] = self.sftree.nodes[sfid].render_json()

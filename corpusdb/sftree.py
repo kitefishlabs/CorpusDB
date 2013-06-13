@@ -42,8 +42,10 @@ class SFTree:
 		"""
 # 		print "add file: ", filename, "for sfid: ", sfID
 		if snd_subdir:
+			rel_path = os.path.join(snd_subdir, filename)
 			joined_path = os.path.join(self.anchorPath, 'snd', snd_subdir, filename)
 		else:
+			rel_path = filename
 			joined_path = os.path.join(self.anchorPath, 'snd', filename)
 # 		print "joined: ", joined_path
 		if uniqueFlag:
@@ -62,11 +64,11 @@ class SFTree:
 # 		print 'SD: ', synthdef
 		
 		try:
-			self.nodes[sfID] = SamplerNode(joined_path, synthdef, dur, flag, chnls, sfg, tratio, sfID)
+			self.nodes[sfID] = SamplerNode(rel_path, synthdef, dur, flag, chnls, sfg, tratio, sfID)
 			
 			# secondary mappings
-			self.corpus.map_id_to_sf(joined_path, sfID, sfg)
-			self.sfmap[sfID] = [joined_path, dur, tratio, synthdef] # a more compact representation
+			self.corpus.map_id_to_sf(rel_path, sfID, sfg)
+			self.sfmap[sfID] = [rel_path, dur, tratio, synthdef] # a more compact representation
 		
 #			return joined_path, sfg, tratio
 			return self.nodes[sfID]
@@ -200,7 +202,7 @@ class SamplerNode(Node):
 		"""
 	
 		"""
-		return { 'path' : self.sfpath,
+		return { 'relpath' : self.sfpath,
 			'synth' : self.synth,
 			'params' : self.params,
 			'duration' : self.duration,
