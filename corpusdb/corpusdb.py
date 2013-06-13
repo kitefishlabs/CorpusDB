@@ -259,12 +259,10 @@ class CorpusDB:
 		self.sftree.map_soundfile_to_group(sfid, sfgroup)
 	
 	
-	def add_sound_file_unit(self, sfid, path=None, onset=0, dur=0, tag=0):
+	def add_sound_file_unit(self, sfid, onset=0, dur=0, tag=0):
 		"""
 		In add_sound_file_unit, sfg arg is not used...
 		"""
-		if sfid is None and path is not None:
-			sfid = self._lookup_sfid(self._get_snd_path(path))
 		print 'SFID: ', sfid, ' | onset: ', onset, ' | dur: ', dur
 		try:
 			res = self.sftree.nodes[sfid].add_onset_and_dur_pair(onset, dur)
@@ -279,12 +277,10 @@ class CorpusDB:
 	def _get_snd_path(self, fname):
 		return (self.anchor + '/snd/' + fname)
 	
-	def update_sound_file_unit(self, sfid, path=None, relid=None, onset=None, dur=None, tag=None):
+	def update_sound_file_unit(self, sfid, relid=None, onset=None, dur=None, tag=None):
 		"""
 		Change the relid, bounds, or group.
 		"""
-		if sfid is None and path is not None:
-			sfid = self._lookup_sfid(self._get_snd_path(path)	)
 		if relid is not None:
 			try:
 				self.sftree.nodes[sfid].update_unit_segment_params(relid, onset, dur, tag)
@@ -303,13 +299,10 @@ class CorpusDB:
 		if self.sftree.nodes[sfid].unit_segments[relid] is not None:
 			del self.sftree.nodes[sfid].unit_segments[relid]		
 	
-	def clear_sound_file_units(self, sfid, path=None):
+	def clear_sound_file_units(self, sfid):
 		"""
 		Remove all references to all sound file units.
-		"""
-		
-		if sfid is None and path is not None:
-			sfid = self._lookup_sfid(path)
+		"""		
 		try:
 			self.sftree.nodes[sfid].unit_segments = []
 			#self.segtable[sfid]['umd'] = []
@@ -399,25 +392,23 @@ class CorpusDB:
 			self.cutable[k] = None
 	
 	# test me
-	def _lookup_sfid(self, path, transp):
-		"""
-		Look up id by querying path in sfmap table.
-		"""
-		try:
-			
-			sfid = self.sfmap[path]
-		except KeyError:
-			print 'Error: there is no entry for ', path, ' in the sf map. Lookup SFID failed.'
-			return None
-		return sfid
+# 	def _lookup_sfid(self, path, transp):
+# 		"""
+# 		Look up id by querying path in sfmap table.
+# 		"""
+# 		try:
+# 			
+# 			sfid = self.sfmap[path]
+# 		except KeyError:
+# 			print 'Error: there is no entry for ', path, ' in the sf map. Lookup SFID failed.'
+# 			return None
+# 		return sfid
 
 	# test me
-	def get_sound_file_unit_metadata(self, sfid, path=None):
+	def get_sound_file_unit_metadata(self, sfid):
 		"""
 		Get the metadata rows for all units associated with a sound file.
 		"""
-		if sfid is None and path is not None:
-			sfid = self._lookup_sfid(path)
 		return sorted([entry for entry in self.cutable if entry[2] == sfid], key = lambda row: row[0])
 	
 	def map_sound_file_units_to_corpus_units(self):
