@@ -258,6 +258,7 @@ class CorpusDB:
 
 		self.sftree.map_soundfile_to_group(sfid, sfgroup)
 	
+	#def get_sf
 	
 	def add_sound_file_unit(self, sfid, onset=0, dur=0, tag=0):
 		"""
@@ -451,6 +452,18 @@ class CorpusDB:
 				print "Unexpected error:", sys.exc_info()[0]
 				raise
 
+	# types: 0 = all, 1 = SamplerNodes, 2 = EfxNodes
+	def convert_sftree_nodes_to_array(self, type=0):
+		keys = sorted(list(self.sftree.nodes.keys()))
+		nodes = []	
+		for k in keys:
+			if ((type == 1) and (hasattr(self.sftree.nodes[k], 'sfpath'))):
+				nodes += [self.sftree.nodes[k]]
+			elif ((type == 2) and (hasattr(self.sftree.nodes[k], 'parent_id'))):
+				nodes += [self.sftree.nodes[k]]
+			else:
+				nodes += [self.sftree.nodes[k]]
+		return nodes
 
 	####*****
 	#
