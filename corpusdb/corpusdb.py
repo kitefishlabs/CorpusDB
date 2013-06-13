@@ -72,12 +72,6 @@ class CorpusDB:
 		self.rawmaps = dict()
 		self.powers = dict()
 		self.mfccs = dict()
-# 		self.activation_layers = dict()
-# 		self.cooked_layers = dict()
-		# corpus-level mappings and helper data structures
-		self.tagmap = dict()
-		self.transformations = dict({0: 'thru', 'thru': 0})
-		self.synthdefs = dict()
 		# information about the corpus's current state
 		self.sf_offset = 0
 		self.cu_offset = 0
