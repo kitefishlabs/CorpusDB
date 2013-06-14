@@ -516,7 +516,7 @@ class CorpusDB:
 	def cuids_for_sfid(self, seed_sfid):
 		return [int(self.cutable[entry][0]) for entry in self.cutable.keys() if self.cutable[entry][2] == seed_sfid]
 			
-	def import_corpus_from_json(self, jsonfilename, appendflag=False, importflag=False):
+	def import_corpus_from_json(self, jsonfilename, appendflag=False, newanchor=None, importflag=False):
 		"""
 		Create a corpus from a json file.
 		Append flag??? Should it be removed as a parameter.
@@ -535,7 +535,8 @@ class CorpusDB:
 		
 		j = jsonpickle.decode(f.read())
 		
-		self.anchor = str(j['anchorpath'])
+		if newanchor is not None:
+			self.anchor = newanchor
 		# warn user if conflicting anchor path?
 		
 		soundfiles = j['soundfiletree']
