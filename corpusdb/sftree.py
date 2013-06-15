@@ -27,16 +27,8 @@ class SFTree:
 		self.anchorPath = path
 		self.nodes = dict()
 		self.sfmap = dict()
-		self.sfgmap = dict()
-			
-	def map_soundfile_to_group(self, sfid, sfgroup):
-		try:
-			self.sfgmap[sfgroup].add(sfid)
-		except KeyError:
-			self.sfgmap[sfgroup] = set([sfid])
-		return self.sfgmap[sfgroup]
-	
-	def add_root_node(self, filename, sfID, tratio, sfg, snd_subdir=None, uniqueFlag=None):
+		
+	def add_root_node(self, filename, sfID, tratio, snd_subdir=None, uniqueFlag=None):
 		"""
 		
 		"""
@@ -64,13 +56,10 @@ class SFTree:
 # 		print 'SD: ', synthdef
 		
 		try:
-			self.nodes[sfID] = SamplerNode(rel_path, synthdef, dur, flag, chnls, sfg, tratio, sfID)
-			
+			self.nodes[sfID] = SamplerNode(rel_path, synthdef, dur, flag, chnls, tratio, sfID)			
 			# secondary mappings
-			self.corpus.map_id_to_sf(rel_path, sfID, sfg)
+			self.corpus.map_id_to_sf(rel_path, sfID)
 			self.sfmap[sfID] = [rel_path, dur, tratio, synthdef] # a more compact representation
-		
-#			return joined_path, sfg, tratio
 			return self.nodes[sfID]
 		except:
 		    print "Unexpected error:", sys.exc_info()[0]
@@ -78,7 +67,7 @@ class SFTree:
 		return None
 	
 		
-	def add_child_node(self, parentID, childID, tratio, sfg, synthdef, params, uniqueFlag=None):
+	def add_child_node(self, parentID, childID, tratio, synthdef, params, uniqueFlag=None):
 		"""
 	
 		"""
@@ -93,13 +82,13 @@ class SFTree:
 			print 'Parent\'s childID is not found. Child node was not added'
 			return None
 		try:
-			self.nodes[childID] = EfxNode(synthdef, params, parentNode.duration, flag, parentNode.channels, sfg, parentNode.tratio, childID, parentID)
+			self.nodes[childID] = EfxNode(synthdef, params, parentNode.duration, flag, parentNode.channels, parentNode.tratio, childID, parentID)
 
 			# secondary mappings
-			self.corpus.map_id_to_sf(self.nodes[parentID].sfpath, childID, sfg)
+			self.corpus.map_id_to_sf(self.nodes[parentID].sfpath, childID)
 			self.sfmap[childID] = [synthdef, params]
 			
-#			return childID, sfg, tratio
+#			return childID, tratio
 			return self.nodes[self.nodes[childID].sfid]
 
 		except:
@@ -118,7 +107,6 @@ class Node:
 		self.duration = duration
 		self.unique_id = uniqueID
 		self.channels = channels
-		self.group = group
 		self.tratio = tratio
 		self.sfid = sfID
 		self.unit_segments = [] # create an empty container for unit bounds and tags
@@ -173,14 +161,14 @@ class Node:
 	
 class SamplerNode(Node):
 	"""
-	SamplerNode(joined_path, synthdef, dur, flag, chnls, sfg, tratio, sfID)
+	SamplerNode(joined_path, synthdef, dur, flag, chnls, tratio, sfID)
 	"""
-	def __init__(self, sfpath, synthname, duration=-1, uniqueID=-1, channels=1, group=0, tratio=1.0, sfID=-1):
+	def __init__(self, sfpath, synthname, duration=-1, uniqueID=-1, channels=1, tratio=1.0, sfID=-1):
 		"""
 	
 		"""
 		try:
-			Node.__init__(self, synthname, None, duration, uniqueID, channels, group, tratio, sfID)
+			Node.__init__(self, synthname, None, duration, uniqueID, channels, tratio, sfID)
 		except AttributeError:
 			print 'Atrribute Error in superclass init'
 		self.sfpath = sfpath
@@ -208,21 +196,20 @@ class SamplerNode(Node):
 			'duration' : self.duration,
 			'uniqueID' : self.unique_id,
 			'channels' : self.channels,
-			'group' : self.group,
 			'tRatio' : self.tratio,
 			'sfID' : self.sfid,
 			'hash' : self.hashstring }
 
 class EfxNode(Node):
 	"""
-	EfxNode(synthdef, params, parentNodeMD['duration'], flag, parentNodeMD['channels'], sfg, childID, parentID, parentNodeMD['tratio'])
+	EfxNode(synthdef, params, parentNodeMD['duration'], flag, parentNodeMD['channels'], childID, parentID, parentNodeMD['tratio'])
 	"""
-	def __init__(self, synthname, params, duration=-1, uniqueID=-1, channels=1, group=0, tratio=1.0, childID=-1, parentID=-1):
+	def __init__(self, synthname, params, duration=-1, uniqueID=-1, channels=1, tratio=1.0, childID=-1, parentID=-1):
 		"""
 	
 		"""
 		try:
-			Node.__init__(self, synthname, params, duration, uniqueID, channels, group, tratio, childID)
+			Node.__init__(self, synthname, params, duration, uniqueID, channels, tratio, childID)
 		except AttributeError:
 			print 'Atrribute Error in superclass init'
 		self.parent_id = parentID
@@ -256,7 +243,6 @@ class EfxNode(Node):
 			'duration' : self.duration,
 			'uniqueID' : self.unique_id,
 			'channels' : self.channels,
-			'group' : self.group,
 			'tRatio' : self.tratio,
 			'sfID' : self.sfid,
 			'hash' : self.hashstring }
