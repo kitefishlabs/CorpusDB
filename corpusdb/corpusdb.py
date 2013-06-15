@@ -76,8 +76,8 @@ class CorpusDB:
 		self.sf_offset = 0
 		self.cu_offset = 0
 		self.sfg_set = set() # to-do: make this work: the set has to be valid after every change to cutable & segtable
-		self.dtable = dict({0: 'unitID', 1: 'sfRelID', 2: 'sfileID', 3: 'sfGrpID',
-			4: 'onset', 5: 'duration', 6: 'tRatio', 7: 'uTag'})
+		self.dtable = dict({0: 'unitID', 1: 'parentID', 2: 'sfileID', 3: 'sfRelID', 4:, 'procID',
+			5: 'onset', 6: 'duration', 7: 'tRatio', 8: 'tag'})
 	
 	def add_sound_file(self, filename=None, sfid=None, srcFileID=None, tratio=1.0, sfGrpID=0, synthdef=None, params=None, subdir=None, reuseFlag=None, importFlag=None, uflag=None):
 		"""
