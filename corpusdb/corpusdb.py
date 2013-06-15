@@ -65,7 +65,6 @@ class CorpusDB:
 	def reset_corpus(self):
 		
 		self.sftree = sftree.SFTree(self, self.anchor)
-# 		self.segtable = dict() # segtable's role is now part of the sftree nodes!
 		self.cutable = dict()
 		# data structures for raw data and corpus data
 		self.rawtable = dict()
@@ -75,11 +74,10 @@ class CorpusDB:
 		# information about the corpus's current state
 		self.sf_offset = 0
 		self.cu_offset = 0
-		self.sfg_set = set() # to-do: make this work: the set has to be valid after every change to cutable & segtable
-		self.dtable = dict({0: 'unitID', 1: 'parentID', 2: 'sfileID', 3: 'sfRelID', 4:, 'procID',
+		self.dtable = dict({0: 'unitID', 1: 'parentID', 2: 'sfileID', 3: 'sfRelID', 4: 'procID',
 			5: 'onset', 6: 'duration', 7: 'tRatio', 8: 'tag'})
 	
-	def add_sound_file(self, filename=None, sfid=None, srcFileID=None, tratio=1.0, sfGrpID=0, synthdef=None, params=None, subdir=None, reuseFlag=None, importFlag=None, uflag=None):
+	def add_sound_file(self, filename=None, sfid=None, srcFileID=None, tratio=1.0, synthdef=None, params=None, subdir=None, reuseFlag=None, importFlag=None, uflag=None):
 		"""
 		Add a sound file to the corpus. Either a filename or an sfid must be provided.
 		"""
@@ -92,20 +90,18 @@ class CorpusDB:
 
 		if srcFileID is None:
 			
-			#pth, grp, tratio
-			root_node = self.sftree.add_root_node(filename, sfid, tratio, sfGrpID, snd_subdir=subdir, uniqueFlag=uflag)
-			print "add_root_node res: ", root_node.sfpath, ', ', root_node.sfid, ', ', root_node.group, ', ', root_node.tratio
-			
+			root_node = self.sftree.add_root_node(filename, sfid, tratio, snd_subdir=subdir, uniqueFlag=uflag)
+			print "add_root_node res: ", root_node.sfpath, ', ', root_node.sfid, ', ', root_node.tratio			
 			return root_node
 			
 			# print "import flag: ", importFlag, 
 			if importFlag: self.import_sound_file_to_buffer(root_node.sfpath, sfid)
 		
 		else:
-			#print 'ADD CHILD: ', srcFileID, ' | ', sfid, ' | ', tratio, ' | ', sfGrpID, ' | ', synthdef, ' | ', params
-			# sfid, grp, tratio
-			child_node = self.sftree.add_child_node(srcFileID, sfid, tratio, sfGrpID, synthdef, params, uniqueFlag=uflag)
-			print "add_child_node res: ", child_node.parent_id, ', ', child_node.sfid, ', ', child_node.group, ', ', child_node.tratio
+			#print 'ADD CHILD: ', srcFileID, ' | ', sfid, ' | ', tratio, ' | ', synthdef, ' | ', params
+			# sfid, tratio
+			child_node = self.sftree.add_child_node(srcFileID, sfid, tratio, synthdef, params, uniqueFlag=uflag)
+			print "add_child_node res: ", child_node.parent_id, ', ', child_node.sfid, ', ', child_node.tratio
 			return child_node
 		
 
@@ -149,27 +145,10 @@ class CorpusDB:
 			print "RAW MAPS SHAPE: ", self.rawmaps[sfid].shape
 			power_vector = self.rawmaps[sfid].T[0]
 			mfccs_vector = self.rawmaps[sfid].T[1:].T
-		
-# 		interm = np.ma.masked_invalid(mfccs_vector)
-# 		interm = interm.filled(interm.mean())
-		
-# 		self.activation_layers[sfid] = np.zeros(self.rawmaps[sfid].shape[0])
-# 		gte = np.argwhere(power_vector>=0.00001)
-# 		self.activation_layers[sfid][gte] = 1
-# 		
-# 		self.cooked_layers[sfid] = mfccs_vector[sfid][:]
-		
-# 		for i, row in enumerate(interm):
-# 			if self.activation_layers[sfid][i] > 0.5:
-# 				self.cooked_layers[sfid] = np.append(np.atleast_2d(self.cooked_layers[sfid]), row[:])
-# 			else:
-# 				self.cooked_layers[sfid] = np.append(np.atleast_2d(self.cooked_layers[sfid]), np.zeros(24))
 		self.powers[sfid] = power_vector
 		self.mfccs[sfid] = mfccs_vector
-		
-# 		del interm
-		
-		return self.powers[sfid], self.mfccs[sfid] #, self.activation_layers[sfid], self.cooked_layers[sfid]
+				
+		return self.powers[sfid], self.mfccs[sfid]
     
 	def _deactivate_raw_sound_file(self, sfid):
 		"""
@@ -177,8 +156,6 @@ class CorpusDB:
 		"""
 		try:
 			del self.rawmaps[sfid]
-# 			del self.activation_layers[sfid]
-# 			del self.cooked_layers[sfid]
 			del self.powers[sfid]
 			del self.mfccs[sfid]
 		except KeyError:
@@ -186,7 +163,7 @@ class CorpusDB:
 			return None
 		return sfid
 	
-	def analyze_sound_file(self, filename, sfid, group=0, tratio=1.0, subdir=None):
+	def analyze_sound_file(self, filename, sfid, tratio=1.0, subdir=None):
 		"""
 		Read NRT OSC score file, perform analysis asynchronously via shell, wait, signal completion and clean up.
 		"""
@@ -198,7 +175,6 @@ class CorpusDB:
 		else:
 			fullpath = os.path.join(self.anchor, 'snd', filename)
 
-		# fullpath = os.path.join(self.anchor, 'snd', filename)
 		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(filename)[0] + '_' + `tratio` + '_power_mfcc24Analyzer.osc'))
 		#print 'create nrt score args: ', fullpath, ' ', oscpath
 		#print sfid, ' '	, tratio, ' ', self.rate, ' ', self.sftree.nodes[sfid].duration, ' ', oscpath
@@ -225,10 +201,8 @@ class CorpusDB:
 		args = shlex.split(cmd)
 		rc = subprocess.call(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, close_fds=True)
 		
-# 		print 'PID: ', p.pid
-# 		rc = p.wait()
-		
-		print 'RC: ', rc
+# 		print 'PID: ', p.pid		
+# 		print 'RC: ', rc
 		if rc == 1:
 			cwd = os.path.abspath(fullpath)
 			fname = string.split(os.path.basename(fullpath), '.')
@@ -245,19 +219,18 @@ class CorpusDB:
 			print 'Analysis was not successful; failed to map raw sound file!!!'
 	
 	
-	def map_id_to_sf(self, path, sfid=None, sfgroup=0):
-		"""
-		Map an integer index to a sound file path. Also adds mapping from the group id ->.
-		"""
-		if sfid is not None:
-			id = sfid
-		else:
-			self.sf_offset += 1
-			id = self.sf_offset
-		#print "sfgmap val: ", self.sfgmap[sfgroup]
-
-		curr_set = self.sftree.map_soundfile_to_group(sfid, sfgroup)
-		return curr_set
+# 	def map_id_to_sf(self, path, sfid=None):
+# 		"""
+# 		Map an integer index to a sound file path. Also adds mapping from the group id ->.
+# 		"""
+# 		if sfid is not None:
+# 			id = sfid
+# 		else:
+# 			self.sf_offset += 1
+# 			id = self.sf_offset
+# 		#print "sfgmap val: ", self.sfgmap[sfgroup]
+# 
+# 		return curr_set
 		
 	def add_sound_file_unit(self, sfid, onset=0, dur=0, tag=0):
 		"""
@@ -279,7 +252,7 @@ class CorpusDB:
 	
 	def update_sound_file_unit(self, sfid, relid=None, onset=None, dur=None, tag=None):
 		"""
-		Change the relid, bounds, or group.
+		Change the relid, bounds or...
 		"""
 		if relid is not None:
 			try:
@@ -425,9 +398,8 @@ class CorpusDB:
 		print self.sftree.nodes.keys()
 		for node in self.sftree.nodes.keys():
 			sf_id = self.sftree.nodes[node].sfid
-			sf_grp = self.sftree.nodes[node].group
 			sf_tratio = self.sftree.nodes[node].tratio
-# 			print sf_id, '|', sf_grp, '|', sf_tratio
+# 			print sf_id, '|', sf_tratio
 			sf_unit_segments = self.sftree.nodes[node].unit_segments
 			relid = 0
 			
@@ -438,9 +410,8 @@ class CorpusDB:
 					mfccs_segment = self.sftree.nodes[node].unit_mfccs[k]
 					index = self.cu_offset
 					
-					# GROUP!!!!
 # 					print '@ relid: ', sf_unit_segments[relid].onset
-					row = np.array([index, relid, sf_id, sf_grp, sf_unit_segments[relid].onset, sf_unit_segments[relid].dur, sf_tratio, sf_unit_segments[relid].tag])
+					row = np.array([index, relid, sf_id, sf_unit_segments[relid].onset, sf_unit_segments[relid].dur, sf_tratio, sf_unit_segments[relid].tag])
 #  					print 'row: ', row.shape
 #  					print 'amp segment: ', amp_segment
 #  					print 'mfccs segment: ', mfccs_segment
@@ -552,7 +523,6 @@ class CorpusDB:
 											sfid=sf['sfID'] + self.sf_offset, 
 											srcFileID=None, 
 											tratio=sf['tRatio'], 
-											sfGrpID=sf['group'], 
 # 											importFlag=importFlag, 
 											uflag=sf['uniqueID'])
 		for key in soundfiles:
@@ -573,7 +543,6 @@ class CorpusDB:
 												sfid=(sf['sfID'] + self.sf_offset), 
 												srcFileID=(pid + self.sf_offset), 
 												tratio=sf['tRatio'], 
-												sfGrpID=sf['group'], 
 												synthdef=str(sf['synth'][0]), 
 												params=params,
 												uflag=sf['uniqueID'])

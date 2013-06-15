@@ -58,7 +58,7 @@ class SFTree:
 		try:
 			self.nodes[sfID] = SamplerNode(rel_path, synthdef, dur, flag, chnls, tratio, sfID)			
 			# secondary mappings
-			self.corpus.map_id_to_sf(rel_path, sfID)
+# 			self.corpus.map_id_to_sf(rel_path, sfID)
 			self.sfmap[sfID] = [rel_path, dur, tratio, synthdef] # a more compact representation
 			return self.nodes[sfID]
 		except:
@@ -85,7 +85,7 @@ class SFTree:
 			self.nodes[childID] = EfxNode(synthdef, params, parentNode.duration, flag, parentNode.channels, parentNode.tratio, childID, parentID)
 
 			# secondary mappings
-			self.corpus.map_id_to_sf(self.nodes[parentID].sfpath, childID)
+# 			self.corpus.map_id_to_sf(self.nodes[parentID].sfpath, childID)
 			self.sfmap[childID] = [synthdef, params]
 			
 #			return childID, tratio

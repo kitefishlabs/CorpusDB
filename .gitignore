@@ -5,6 +5,7 @@ build/*
 */_
 *.md.wav
 *.osc
+*.json
 
 *.pyc
 

@@ -1,5 +1,8 @@
 from corpusdb import *
-amendb = CorpusDB("/Users/kfl/dev/git/CorpusDB/corpusdb/examples/1_simple_analysis/")
+from bregman.suite import *
+
+
+amendb = CorpusDB("/Users/kfl/dev/git/CorpusDB/corpusdb/examples/1-2_simple_analysis/")
 amendb.import_corpus_from_json("test_amen.json")
 
 mfccs_mat = amendb.convert_corpus_to_array('M')
@@ -7,7 +10,7 @@ mfccs_mat.shape
 
 imagesc(mfccs_mat.T)
 
-DEPTH = 100
+DEPTH = 10
 
 nearby = np.array([], dtype='float32')
 
