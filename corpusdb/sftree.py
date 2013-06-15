@@ -95,7 +95,8 @@ class SFTree:
 			print 'Parent\'s childID is not found. Child node was not added'
 			return None
 		try:
-			self.nodes[childID] = EfxNode(synthdef, params, parentNode.duration, flag, parentNode.channels, parentNode.tratio, childID, parentID)
+			# params[0] is a hack!
+			self.nodes[childID] = EfxNode(synthdef, params[0], parentNode.duration, flag, parentNode.channels, parentNode.tratio, childID, parentID)
 			print "child hashstring: ", self.nodes[childID].hashstring
 			procID = self.check_procmap(self.nodes[childID].hashstring)
 			# secondary mappings

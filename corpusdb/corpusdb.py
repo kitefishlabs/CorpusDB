@@ -74,8 +74,8 @@ class CorpusDB:
 		# information about the corpus's current state
 		self.sf_offset = 0
 		self.cu_offset = 0
-		self.dtable = dict({0: 'unitID', 1: 'parentID', 2: 'sfileID', 3: 'sfRelID', 4: 'procID',
-			5: 'onset', 6: 'duration', 7: 'tRatio', 8: 'tag'})
+		self.dtable = dict({0: 'unitID', 1: 'parentID', 2: 'sfileID', 3: 'sfRelID', 4: 'procID', 5: 'tag',
+			6: 'onset', 7: 'duration', 8: 'tRatio'})
 		
 	def add_sound_file(self, filename=None, sfid=None, srcFileID=None, tratio=1.0, synthdef=None, params=None, subdir=None, reuseFlag=None, importFlag=None, uflag=None):
 		"""
@@ -399,7 +399,11 @@ class CorpusDB:
 		for node in self.sftree.nodes.keys():
 			sf_id = self.sftree.nodes[node].sfid
 			sf_tratio = self.sftree.nodes[node].tratio
-# 			print sf_id, '|', sf_tratio
+			sf_proc_id = self.sftree.procmap[ self.sftree.nodes[node].hashstring ]
+			try:
+				parent_id = self.sftree.nodes[node].parent_id
+			except AttributeError:
+				parent_id = sf_id
 			sf_unit_segments = self.sftree.nodes[node].unit_segments
 			relid = 0
 			
@@ -411,7 +415,8 @@ class CorpusDB:
 					index = self.cu_offset
 					
 # 					print '@ relid: ', sf_unit_segments[relid].onset
-					row = np.array([index, relid, sf_id, sf_unit_segments[relid].onset, sf_unit_segments[relid].dur, sf_tratio, sf_unit_segments[relid].tag])
+					# dict({0: 'unitID', 1: 'parentID', 2: 'sfileID', 3: 'sfRelID', 4: 'procID', 5: 'tag', 6: 'onset', 7: 'duration', 8: 'tRatio'})
+					row = np.array([index, parent_id, sf_id, relid, sf_proc_id, sf_unit_segments[relid].tag, sf_unit_segments[relid].onset, sf_unit_segments[relid].dur, sf_tratio])
 #  					print 'row: ', row.shape
 #  					print 'amp segment: ', amp_segment
 #  					print 'mfccs segment: ', mfccs_segment
@@ -443,8 +448,8 @@ class CorpusDB:
 	# CORPUS RAW ARRAY ACCESS
 	#
 	
-	#	 index (8)         amp (5)        mfccs (24)	
-	#	[0 1 2 3 4 5 6 7] [8 9 10 11 12] [13 14 15 16 17 ... 36]
+	#	 index (9)           amp (5)         mfccs (24)	
+	#	[0 1 2 3 4 5 6 7 8] [9 10 11 12 13] [14 15 16 17 ... 37]
 	#
 	
 	def convert_corpus_to_array(self, type='all', map_flag=False):
@@ -460,9 +465,9 @@ class CorpusDB:
 		X = np.array(xlist, dtype='float32')
 		X = np.reshape(X, (-1, num_descriptors))
 		
-		if type is 'I':		return np.c_[X[:,0], X[:,:8]]
-		elif type is 'A': 	return np.c_[X[:,0], X[:,8:13]]
-		elif type is 'M':	return np.c_[X[:,0], X[:,13:]]
+		if type is 'I':		return np.c_[X[:,0], X[:,:9]]
+		elif type is 'A': 	return np.c_[X[:,0], X[:,9:14]]
+		elif type is 'M':	return np.c_[X[:,0], X[:,14:]]
 		elif type is 'all':	return np.c_[X[:,0], X]
 		else:				raise ArgumentError
 	
@@ -533,7 +538,7 @@ class CorpusDB:
 				pid = sf['parentID']
 				
 				print ">>> params: ", sf['params']
-				params = [str(p) if (type(p) == type(u'')) else p for p in sf['params'][0]]
+				params = [[str(p) if (type(p) == type(u'')) else p for p in sf['params']]]
 				print ">>> params: ", params
 				
 				# params_with_dur = sf['params'] + ['dur', sf[ sf['parentid'] ]]
@@ -561,9 +566,10 @@ class CorpusDB:
 			except AttributeError:
 				cunit = corpusunits[str(key)]
 			print "cunit: ", cunit
-			print "cunit type: ", type(cunit[2])
 			cunit[0] += self.cu_offset
 			print "cunit[0]: ", cunit[0]
+			cunit[1] += self.sftree.procmap_offset
+			print "cunit[1]: ", cunit[1]
 			cunit[2] += self.sf_offset
 			print "cunit[2]: ", cunit[2]
 			self.add_corpus_unit(int(key) + self.cu_offset, cunit)
@@ -583,7 +589,10 @@ class CorpusDB:
 		jsonpath = os.path.join(self.anchor, 'json', jsonfilename)		
 		f = open(jsonpath, 'w')
 		# don't forget the descriptors...
-		toplevel = { 'descriptors': self.dtable, 'anchorpath': self.anchor }
+		print ''
+		print self.sftree.procmap
+		print ''
+		toplevel = { 'descriptors': self.dtable, 'anchorpath': self.anchor, 'procmap': self.sftree.procmap }
 		sf = dict()
 		for sfid in self.sftree.nodes.keys():
 			sf[sfid] = self.sftree.nodes[sfid].render_json()
