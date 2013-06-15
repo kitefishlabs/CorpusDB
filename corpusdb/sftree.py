@@ -27,7 +27,18 @@ class SFTree:
 		self.anchorPath = path
 		self.nodes = dict()
 		self.sfmap = dict()
-		
+		self.procmap = dict()
+		self.procmap_offset = 0
+	
+	def check_procmap(self, hashstring):
+		try:
+			return self.procmap[hashstring]
+		except KeyError:
+			self.procmap[hashstring] = self.procmap_offset
+			self.procmap[self.procmap_offset] = hashstring
+			self.procmap_offset += 1
+			return self.procmap_offset - 1
+	
 	def add_root_node(self, filename, sfID, tratio, snd_subdir=None, uniqueFlag=None):
 		"""
 		
@@ -56,10 +67,12 @@ class SFTree:
 # 		print 'SD: ', synthdef
 		
 		try:
-			self.nodes[sfID] = SamplerNode(rel_path, synthdef, dur, flag, chnls, tratio, sfID)			
+			self.nodes[sfID] = SamplerNode(rel_path, synthdef, dur, flag, chnls, tratio, sfID)
+			print "hashstring: ", self.nodes[sfID].hashstring
+			procID = self.check_procmap(self.nodes[sfID].hashstring)
 			# secondary mappings
 # 			self.corpus.map_id_to_sf(rel_path, sfID)
-			self.sfmap[sfID] = [rel_path, dur, tratio, synthdef] # a more compact representation
+			self.sfmap[sfID] = [rel_path, dur, tratio, synthdef, procID] # a more compact representation
 			return self.nodes[sfID]
 		except:
 		    print "Unexpected error:", sys.exc_info()[0]
@@ -83,10 +96,11 @@ class SFTree:
 			return None
 		try:
 			self.nodes[childID] = EfxNode(synthdef, params, parentNode.duration, flag, parentNode.channels, parentNode.tratio, childID, parentID)
-
+			print "child hashstring: ", self.nodes[childID].hashstring
+			procID = self.check_procmap(self.nodes[childID].hashstring)
 			# secondary mappings
 # 			self.corpus.map_id_to_sf(self.nodes[parentID].sfpath, childID)
-			self.sfmap[childID] = [synthdef, params]
+			self.sfmap[childID] = [synthdef, params, procID]
 			
 #			return childID, tratio
 			return self.nodes[self.nodes[childID].sfid]
@@ -98,7 +112,7 @@ class SFTree:
 
 
 class Node:
-	def __init__(self, synthname, params=None, duration=-1, uniqueID=-1, channels=1, group=0, tratio=1.0, sfID=-1):
+	def __init__(self, synthname, params=None, duration=-1, uniqueID=-1, channels=1, tratio=1.0, sfID=-1):
 		"""
 	
 		"""
@@ -109,6 +123,7 @@ class Node:
 		self.channels = channels
 		self.tratio = tratio
 		self.sfid = sfID
+		self.hashstring = ""
 		self.unit_segments = [] # create an empty container for unit bounds and tags
 		self.unit_amps = dict()
 		self.unit_mfccs = dict()
@@ -213,8 +228,12 @@ class EfxNode(Node):
 		except AttributeError:
 			print 'Atrribute Error in superclass init'
 		self.parent_id = parentID
-		self.hashstring = str(self.synth[0])
-		pdict = dict(zip([str(x) for x in self.params[0][0::2]], self.params[0][1::2]))
+# 		self.hashstring = str(self.synth[0])
+		print ''
+		print "params: ", self.params
+		pdict = dict(zip([str(x) for x in self.params[0::2]], self.params[1::2]))
+		print ''
+		print pdict
 		for k in pdict:
 			if (k != 'outbus') and (k != 'inbus') and (k != 'dur') and (k != 'envDur') and (k != 'transp'):
 				self.hashstring += k

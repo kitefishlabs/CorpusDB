@@ -76,7 +76,7 @@ class CorpusDB:
 		self.cu_offset = 0
 		self.dtable = dict({0: 'unitID', 1: 'parentID', 2: 'sfileID', 3: 'sfRelID', 4: 'procID',
 			5: 'onset', 6: 'duration', 7: 'tRatio', 8: 'tag'})
-	
+		
 	def add_sound_file(self, filename=None, sfid=None, srcFileID=None, tratio=1.0, synthdef=None, params=None, subdir=None, reuseFlag=None, importFlag=None, uflag=None):
 		"""
 		Add a sound file to the corpus. Either a filename or an sfid must be provided.
