@@ -256,10 +256,9 @@ class CorpusDB:
 			id = self.sf_offset
 		#print "sfgmap val: ", self.sfgmap[sfgroup]
 
-		self.sftree.map_soundfile_to_group(sfid, sfgroup)
-	
-	#def get_sf
-	
+		curr_set = self.sftree.map_soundfile_to_group(sfid, sfgroup)
+		return curr_set
+		
 	def add_sound_file_unit(self, sfid, onset=0, dur=0, tag=0):
 		"""
 		In add_sound_file_unit, sfg arg is not used...
@@ -358,13 +357,17 @@ class CorpusDB:
 		
 	# [MEAN, MAX, LVAL, RVAL, SLOPE]
 	def analyze_scalar(self, raw_stripped, offset, dur):
-		chopped = np.array(raw_stripped[offset:(offset+dur)], dtype=np.float32)
-		mean = np.mean(chopped, dtype=np.float32)
-		max = np.max(chopped)
-		l_val = np.mean(chopped[:5], dtype=np.float32)
-		r_val = np.mean(chopped[-5:], dtype=np.float32)
+# 		print "dur: ", dur
+		chopped = raw_stripped[offset:(offset+dur)]
+# 		print np.mean(chopped[:2])
+# 		print np.mean(chopped[-2:])
+		mn = np.mean(chopped)
+		max = np.max(chopped).tolist()
+		l_val = np.mean(chopped[:2])
+		r_val = np.mean(chopped[-2:])
 		slope = (r_val - l_val) / float(dur)
-		return [mean, max, l_val, r_val, slope]
+# 		print [mn, max, l_val, r_val]
+		return [(math.log10(x) * 20.0) if x > 0.000001 else -120 for x in [mn, max, l_val, r_val]] + [slope]
 
 	# test me
 	def add_corpus_unit(self, uid, metadata):
@@ -434,7 +437,6 @@ class CorpusDB:
 					amp_segment = self.sftree.nodes[node].unit_amps[k]
 					mfccs_segment = self.sftree.nodes[node].unit_mfccs[k]
 					index = self.cu_offset
-					
 					
 					# GROUP!!!!
 # 					print '@ relid: ', sf_unit_segments[relid].onset
