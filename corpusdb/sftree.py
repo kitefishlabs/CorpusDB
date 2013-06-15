@@ -37,7 +37,7 @@ class SFTree:
 			self.procmap[hashstring] = self.procmap_offset
 			self.procmap[self.procmap_offset] = hashstring
 			self.procmap_offset += 1
-			return self.procmap_offset - 1
+			return self.procmap[hashstring]
 	
 	def add_root_node(self, filename, sfID, tratio, snd_subdir=None, uniqueFlag=None):
 		"""
