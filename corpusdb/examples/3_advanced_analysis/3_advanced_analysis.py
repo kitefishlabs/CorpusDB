@@ -1,6 +1,3 @@
-# 2/13/2013
-# This is an example script for analyzing a corpus of sounds.
-
 """
 *******************
 analysis_example.py

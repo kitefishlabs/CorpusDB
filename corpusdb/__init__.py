@@ -21,4 +21,14 @@ Supercollider + Python + Corpus-based Processing.
 
 """
 
+__version__ = '1.0'
+__author__ = 'Thomas Stoll'
+__copyright__ = "Copyright (C) 2013  Thomas Stoll, All Rights Reserved"
+__license__ = "gpl 3.0 or higher"
+__email__ = 'tms@kitefishlabs.com'
+
+__all__ = ["corpusdb", "corpusorganizer"]
+
+# import the bregman modules
 from corpusdb import *
+from corpusorganizer import *

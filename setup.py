@@ -10,7 +10,7 @@ setup(name = 'corpusdb',
     author_email = 'tms@kitefishlabs.com',
     url = 'http://www.kitefishlabs.com',
 
-    packages = [ 'corpusdb' ],
+    packages = [ 'corpusdb'],
     data_files = [ ]
 )
 
