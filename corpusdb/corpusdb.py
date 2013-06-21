@@ -399,7 +399,7 @@ class CorpusDB:
 		for node in self.sftree.nodes.keys():
 			sf_id = self.sftree.nodes[node].sfid
 			sf_tratio = self.sftree.nodes[node].tratio
-			sf_proc_id = self.sftree.procmap[ self.sftree.nodes[node].hashstring ]
+			sf_proc_id = [k for k,v in self.sftree.procmap.iteritems if v == self.sftree.nodes[node].hashstring][0]
 			try:
 				parent_id = self.sftree.nodes[node].parent_id
 			except AttributeError:
@@ -505,7 +505,7 @@ class CorpusDB:
 			self.reset_corpus()
 		else:
 			print 'appendflag is TRUE'
-			print 'sf_offset: ', self.sf_offset 			
+			print 'sf_offset: ', self.sf_offset
 			
 		#set up
 		jsonpath = os.path.join(self.anchor, 'json', jsonfilename)
@@ -516,6 +516,9 @@ class CorpusDB:
 		if newanchor is not None:
 			self.anchor = newanchor
 		# warn user if conflicting anchor path?
+		
+		current_procmap_offset = self.sftree.procmap_offset
+		print "current_procmap_offset: ", current_procmap_offset
 		
 		soundfiles = j['soundfiletree']
 		for key in soundfiles:
@@ -528,7 +531,6 @@ class CorpusDB:
 											sfid=sf['sfID'] + self.sf_offset, 
 											srcFileID=None, 
 											tratio=sf['tRatio'], 
-# 											importFlag=importFlag, 
 											uflag=sf['uniqueID'])
 		for key in soundfiles:
 			sf = soundfiles[key]
@@ -556,28 +558,30 @@ class CorpusDB:
 				#print 'Uh-oh'
 				
 		corpusunits = j['corpusunits']
-		for key in corpusunits:
-# 			print '-----------------------'
+		print "proc map offset: ", self.sftree.procmap_offset
+		for key in sorted([int(x) for x in list(corpusunits.keys())] ):
+ 			print '-----------------------'
 # 			print type(key)
-# 			print corpusunits[str(key)]
+ 			print corpusunits[str(key)]
 			cunit = corpusunits[str(key)]
 			try:
 				cunit = [float(x) for x in cunit.strip('[]').split(',')]
 			except AttributeError:
 				cunit = corpusunits[str(key)]
-			print "cunit: ", cunit
+# 			print "cunit: ", cunit
 			cunit[0] += self.cu_offset
-			print "cunit[0]: ", cunit[0]
-			cunit[1] += self.sftree.procmap_offset
-			print "cunit[1]: ", cunit[1]
+# 			print "cunit[0]: ", cunit[0]
+			cunit[1] += current_procmap_offset
+# 			print "cunit[1]: ", cunit[1]
 			cunit[2] += self.sf_offset
-			print "cunit[2]: ", cunit[2]
+# 			print "cunit[2]: ", cunit[2]
 			self.add_corpus_unit(int(key) + self.cu_offset, cunit)
 		
 		self.sf_offset = max(self.sftree.nodes.keys()) + 1
 		print 'UPDATE max sfid --> sf_offset: ', self.sf_offset
 		self.cu_offset = max(self.cutable.keys()) + 1
 		print 'UPDATE max cutable key --> cu_offset: ', self.cu_offset
+		self.sftree.procmap_offset = max(self.sftree.procmap.keys()) + 1
 		
 		f.close()
 		
@@ -589,9 +593,9 @@ class CorpusDB:
 		jsonpath = os.path.join(self.anchor, 'json', jsonfilename)		
 		f = open(jsonpath, 'w')
 		# don't forget the descriptors...
-		print ''
-		print self.sftree.procmap
-		print ''
+# 		print ''
+# 		print self.sftree.procmap
+# 		print ''
 		toplevel = { 'descriptors': self.dtable, 'anchorpath': self.anchor, 'procmap': self.sftree.procmap }
 		sf = dict()
 		for sfid in self.sftree.nodes.keys():
@@ -600,10 +604,10 @@ class CorpusDB:
 		# roll the cutable rows into dictionary
 		d = dict()
 		# print 'keys: ', self.cutable.keys()
-		for cid in self.cutable.keys():
+		for cid in sorted(list(self.cutable.keys())):
 			# print 'cutable entry: ', type(self.cutable[cid])
 # 			clist = [("%.5f" % c) if (type(c) == type(1.1)) else str(c) for c in self.cutable[cid].tolist() ]
-			d[cid] = json.dumps(self.cutable[cid].tolist())
+			d[str(cid)] = json.dumps(self.cutable[cid].tolist())
 		toplevel['corpusunits'] = d
 		
 		f.write(jsonpickle.encode(toplevel))	

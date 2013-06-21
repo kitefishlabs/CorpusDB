@@ -34,10 +34,10 @@ class SFTree:
 		try:
 			return self.procmap[hashstring]
 		except KeyError:
-			self.procmap[hashstring] = self.procmap_offset
+# 			self.procmap[hashstring] = self.procmap_offset
 			self.procmap[self.procmap_offset] = hashstring
 			self.procmap_offset += 1
-			return self.procmap[hashstring]
+			return self.procmap[(self.procmap_offset-1)]
 	
 	def add_root_node(self, filename, sfID, tratio, snd_subdir=None, uniqueFlag=None):
 		"""
