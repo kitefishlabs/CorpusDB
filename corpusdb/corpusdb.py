@@ -77,7 +77,7 @@ class CorpusDB:
 		self.dtable = dict({0: 'unitID', 1: 'parentID', 2: 'sfileID', 3: 'sfRelID', 4: 'procID', 5: 'tag',
 			6: 'onset', 7: 'duration', 8: 'tRatio'})
 		
-	def add_sound_file(self, filename=None, sfid=None, srcFileID=None, tratio=1.0, synthdef=None, params=None, subdir=None, reuseFlag=None, importFlag=None, uflag=None):
+	def add_sound_file(self, filename=None, sfid=None, srcFileID=None, tratio=1.0, synthdef=None, params=None, procid=None, subdir=None, reuseFlag=None, importFlag=None, uflag=None):
 		"""
 		Add a sound file to the corpus. Either a filename or an sfid must be provided.
 		"""
@@ -90,7 +90,7 @@ class CorpusDB:
 
 		if srcFileID is None:
 			
-			root_node = self.sftree.add_root_node(filename, sfid, tratio, snd_subdir=subdir, uniqueFlag=uflag)
+			root_node = self.sftree.add_root_node(filename, sfid, tratio, procid=procid, snd_subdir=subdir, uniqueFlag=uflag)
 			print "add_root_node res: ", root_node.sfpath, ', ', root_node.sfid, ', ', root_node.tratio			
 			return root_node
 			
@@ -100,7 +100,7 @@ class CorpusDB:
 		else:
 			#print 'ADD CHILD: ', srcFileID, ' | ', sfid, ' | ', tratio, ' | ', synthdef, ' | ', params
 			# sfid, tratio
-			child_node = self.sftree.add_child_node(srcFileID, sfid, tratio, synthdef, params, uniqueFlag=uflag)
+			child_node = self.sftree.add_child_node(srcFileID, sfid, tratio, synthdef, params, procid=procid, uniqueFlag=uflag)
 			print "add_child_node res: ", child_node.parent_id, ', ', child_node.sfid, ', ', child_node.tratio
 			return child_node
 		
@@ -520,43 +520,40 @@ class CorpusDB:
 		current_procmap_offset = self.sftree.procmap_offset
 		print "current_procmap_offset: ", current_procmap_offset
 		
+		procmap = j['procmap']
+		for key in sorted(procmap.keys()):
+			procid = self.sftree.check_procmap((int(key)+current_procmap_offset), str(procmap[key]))
+
 		soundfiles = j['soundfiletree']
-		for key in soundfiles:
-			sf = soundfiles[key]
+		for key in sorted([int(x) for x in soundfiles.keys()]):
+			sf = soundfiles[str(key)]
+			
+			procid = [int(k) for k,v in procmap.iteritems() if v == sf['hash']][0]
+			print "k procid result: ", procid
 			# print sf
-			try:
-				pkey = sf['parentID']
-			except KeyError:
-				sfid = self.add_sound_file(filename=str(sf['relpath']), 
-											sfid=sf['sfID'] + self.sf_offset, 
-											srcFileID=None, 
-											tratio=sf['tRatio'], 
-											uflag=sf['uniqueID'])
-		for key in soundfiles:
-			sf = soundfiles[key]
-			#print key, ' | ', sf['parentid']
-			#print type(key), ' || ', type(sf['parentid'])
+			
 			try:
 				pid = sf['parentID']
-				
 				print ">>> params: ", sf['params']
 				params = [[str(p) if (type(p) == type(u'')) else p for p in sf['params']]]
 				print ">>> params: ", params
 				
-				# params_with_dur = sf['params'] + ['dur', sf[ sf['parentid'] ]]
-
-				#print key, ' | ', soundfiles[key]['sfid'], ' | ', soundfiles[key]['parentid']
 				sfid = self.add_sound_file(filename=None, 
 												sfid=(sf['sfID'] + self.sf_offset), 
 												srcFileID=(pid + self.sf_offset), 
 												tratio=sf['tRatio'], 
 												synthdef=str(sf['synth'][0]), 
 												params=params,
+												procid=procid,
 												uflag=sf['uniqueID'])
 			except KeyError:
-				pass
-				#print 'Uh-oh'
-				
+				sfid = self.add_sound_file(filename=str(sf['relpath']), 
+											sfid=sf['sfID'] + self.sf_offset, 
+											srcFileID=None, 
+											tratio=sf['tRatio'],
+											procid=procid, 
+											uflag=sf['uniqueID'])
+						
 		corpusunits = j['corpusunits']
 		print "proc map offset: ", self.sftree.procmap_offset
 		for key in sorted([int(x) for x in list(corpusunits.keys())] ):

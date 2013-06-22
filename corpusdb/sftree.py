@@ -30,20 +30,19 @@ class SFTree:
 		self.procmap = dict()
 		self.procmap_offset = 0
 	
-	def check_procmap(self, hashstring):
+	def check_procmap(self, index, hashstring):
 		try:
-			return self.procmap[hashstring]
+			return self.procmap[index]
 		except KeyError:
-# 			self.procmap[hashstring] = self.procmap_offset
-			self.procmap[self.procmap_offset] = hashstring
-			self.procmap_offset += 1
-			return self.procmap[(self.procmap_offset-1)]
+			self.procmap[index] = hashstring
+		return index
 	
-	def add_root_node(self, filename, sfID, tratio, snd_subdir=None, uniqueFlag=None):
+	def add_root_node(self, filename, sfID, tratio, procid=None, snd_subdir=None, uniqueFlag=None):
 		"""
 		
 		"""
 # 		print "add file: ", filename, "for sfid: ", sfID
+		print "root node procid: ", procid
 		if snd_subdir:
 			rel_path = os.path.join(snd_subdir, filename)
 			joined_path = os.path.join(self.anchorPath, 'snd', snd_subdir, filename)
@@ -69,9 +68,16 @@ class SFTree:
 		try:
 			self.nodes[sfID] = SamplerNode(rel_path, synthdef, dur, flag, chnls, tratio, sfID)
 			print "hashstring: ", self.nodes[sfID].hashstring
-			procID = self.check_procmap(self.nodes[sfID].hashstring)
+			if procid:
+				procID = procid
+			else:
+				procID = self.procmap_offset
+				self.procmap_offset += 1
+
+			print "procID: ", procID
+			procID = self.check_procmap(procID, self.nodes[sfID].hashstring)
+			print "procID: ", procID
 			# secondary mappings
-# 			self.corpus.map_id_to_sf(rel_path, sfID)
 			self.sfmap[sfID] = [rel_path, dur, tratio, synthdef, procID] # a more compact representation
 			return self.nodes[sfID]
 		except:
@@ -80,10 +86,11 @@ class SFTree:
 		return None
 	
 		
-	def add_child_node(self, parentID, childID, tratio, synthdef, params, uniqueFlag=None):
+	def add_child_node(self, parentID, childID, tratio, synthdef, params, procid=None, uniqueFlag=None):
 		"""
 	
 		"""
+		print "child node procid: ", procid
 		if uniqueFlag:
 			flag = uniqueFlag
 		else:
@@ -98,12 +105,17 @@ class SFTree:
 			# params[0] is a hack!
 			self.nodes[childID] = EfxNode(synthdef, params[0], parentNode.duration, flag, parentNode.channels, parentNode.tratio, childID, parentID)
 			print "child hashstring: ", self.nodes[childID].hashstring
-			procID = self.check_procmap(self.nodes[childID].hashstring)
+			if procid:
+				procID = procid
+			else:
+				procID = self.procmap_offset
+				self.procmap_offset += 1
+			print "procID: ", procID
+			procID = self.check_procmap(procID, self.nodes[childID].hashstring)
+			print "procID: ", procID
 			# secondary mappings
-# 			self.corpus.map_id_to_sf(self.nodes[parentID].sfpath, childID)
 			self.sfmap[childID] = [synthdef, params, procID]
 			
-#			return childID, tratio
 			return self.nodes[self.nodes[childID].sfid]
 
 		except:
