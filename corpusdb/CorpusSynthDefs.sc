@@ -31,7 +31,7 @@ SynthDef(\monoSampler, { |outbus=20, srcbufNum, start=0, dur=1, transp=1, attack
 }).load(s);
 )
 
-
+(
 // processing Synthdefs - inserted in between Sampler and Analyzer
 SynthDef(\clipDistM, { |outbus=20, inbus=21, mult=1.0, clip=1.0|
 	Out.ar(outbus, Pan2.ar(In.ar(inbus, 1) * mult).clip2(clip), );
