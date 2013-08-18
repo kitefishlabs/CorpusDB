@@ -1,6 +1,7 @@
 import numpy as np
 from bregman.suite import *
 import random, math
+import bisect
 
 
 class UniformRandomGenerator(object):
