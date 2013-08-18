@@ -22,7 +22,7 @@ import os, sys, time, wave, contextlib
 
 class SFTree:
 
-	def __init__(self, crps, path):
+	def __init__(self, crps, path, verb=False):
 		self.corpus = crps
 		self.anchorPath = path
 		self.nodes = dict()
@@ -30,26 +30,26 @@ class SFTree:
 		self.procmap = dict()
 		self.procmap_offset = 0
 	
-	def check_procmap(self, index, hashstring):
+	def check_procmap(self, index, hashstring, verb=False):
 		try:
 			return self.procmap[index]
 		except KeyError:
 			self.procmap[index] = hashstring
 		return index
 	
-	def add_root_node(self, filename, sfID, tratio, procid=None, snd_subdir=None, uniqueFlag=None):
+	def add_root_node(self, filename, sfID, tratio, procid=None, snd_subdir=None, uniqueFlag=None, verb=False):
 		"""
 		
 		"""
-# 		print "add file: ", filename, "for sfid: ", sfID
-		print "root node procid: ", procid
+		if verb: print "add file: ", filename, "for sfid: ", sfID
+		if verb: print "root node procid: ", procid
 		if snd_subdir:
 			rel_path = os.path.join(snd_subdir, filename)
 			joined_path = os.path.join(self.anchorPath, 'snd', snd_subdir, filename)
 		else:
 			rel_path = filename
 			joined_path = os.path.join(self.anchorPath, 'snd', filename)
-# 		print "joined: ", joined_path
+		if verb: print "joined: ", joined_path
 		if uniqueFlag:
 			flag = uniqueFlag
 		else:
@@ -63,20 +63,20 @@ class SFTree:
 		
 		if chnls == 1: synthdef = 'monoSamplerNRT'
 		else: synthdef = 'stereoSamplerNRT'
-# 		print 'SD: ', synthdef
+		if verb: print 'SD: ', synthdef
 		
 		try:
 			self.nodes[sfID] = SamplerNode(rel_path, synthdef, dur, flag, chnls, tratio, sfID)
-			print "hashstring: ", self.nodes[sfID].hashstring
+			if verb: print "hashstring: ", self.nodes[sfID].hashstring
 			if procid:
 				procID = procid
 			else:
 				procID = self.procmap_offset
 				self.procmap_offset += 1
 
-			print "procID: ", procID
+			if verb: print "procID: ", procID
 			procID = self.check_procmap(procID, self.nodes[sfID].hashstring)
-			print "procID: ", procID
+			if verb: print "procID: ", procID
 			# secondary mappings
 			self.sfmap[sfID] = [rel_path, dur, tratio, synthdef, procID] # a more compact representation
 			return self.nodes[sfID]
@@ -86,11 +86,11 @@ class SFTree:
 		return None
 	
 		
-	def add_child_node(self, parentID, childID, tratio, synthdef, params, procid=None, uniqueFlag=None):
+	def add_child_node(self, parentID, childID, tratio, synthdef, params, procid=None, uniqueFlag=None, verb=False):
 		"""
 	
 		"""
-		print "child node procid: ", procid
+		if verb: print "child node procid: ", procid
 		if uniqueFlag:
 			flag = uniqueFlag
 		else:
@@ -99,20 +99,20 @@ class SFTree:
 		try:
 			parentNode = self.nodes[parentID]
 		except KeyError:
-			print 'Parent\'s childID is not found. Child node was not added'
+			if verb: print 'Parent\'s childID is not found. Child node was not added'
 			return None
 		try:
 			# params[0] is a hack!
 			self.nodes[childID] = EfxNode(synthdef, params[0], parentNode.duration, flag, parentNode.channels, parentNode.tratio, childID, parentID)
-			print "child hashstring: ", self.nodes[childID].hashstring
+			if verb: print "child hashstring: ", self.nodes[childID].hashstring
 			if procid:
 				procID = procid
 			else:
 				procID = self.procmap_offset
 				self.procmap_offset += 1
-			print "procID: ", procID
+			if verb: print "procID: ", procID
 			procID = self.check_procmap(procID, self.nodes[childID].hashstring)
-			print "procID: ", procID
+			if verb: print "procID: ", procID
 			# secondary mappings
 			self.sfmap[childID] = [synthdef, params, procID]
 			
@@ -125,7 +125,7 @@ class SFTree:
 
 
 class Node:
-	def __init__(self, synthname, params=None, duration=-1, uniqueID=-1, channels=1, tratio=1.0, sfID=-1):
+	def __init__(self, synthname, params=None, duration=-1, uniqueID=-1, channels=1, tratio=1.0, sfID=-1, verb=False):
 		"""
 	
 		"""
@@ -143,7 +143,7 @@ class Node:
 		self.verify_synthname_and_params()
 
 
-	def verify_synthname_and_params(self):
+	def verify_synthname_and_params(self, verb=False):
 		"""
 	
 		"""
@@ -153,7 +153,7 @@ class Node:
 		#	 optionally warn if they do not
 		pass
 	
-	def add_onset_and_dur_pair(self, onset, dur, relid=None):
+	def add_onset_and_dur_pair(self, onset, dur, relid=None, verb=False):
 # 		print '$$$ ', onset, '|', dur, '|(', relid, ')'
 		if relid is None: relid = len(self.unit_segments)
 		try:
@@ -164,25 +164,25 @@ class Node:
 		
 		return self.unit_segments[relid]
 	
-	def update_unit_segment_params(self, relid, onset=None, dur=None, tag=None):
+	def update_unit_segment_params(self, relid, onset=None, dur=None, tag=None, verb=False):
 		if onset is not None: self.unit_segments[relid].onset = onset
 		if dur is not None: self.unit_segments[relid].dur = dur
 		if tag is not None: self.unit_segments[relid].tag = tag
 		return self.unit_segments[relid]
 	
-	def calc_remaining_dur(self):
+	def calc_remaining_dur(self, verb=False):
 		"""
 		Purely a convenience function for cases where non-overlapping segments are assumed!
 		"""
 		return (self.duration - self.unit_segments[-1].onset)
 	
-	def sort_segments_list(self):
+	def sort_segments_list(self, verb=False):
 		"""
 		
 		"""
 		return  [x for x in self.unit_segments] #.sort(key=lambda unit: unit[0])
 	
-	def add_metadata_for_relid(self, relid, amps=None, mfccs=None):
+	def add_metadata_for_relid(self, relid, amps=None, mfccs=None, verb=False):
 		if relid is not None and amps is not None: self.unit_amps[relid] = amps
 		if relid is not None and mfccs is not None: self.unit_mfccs[relid] = mfccs
 		
@@ -191,7 +191,7 @@ class SamplerNode(Node):
 	"""
 	SamplerNode(joined_path, synthdef, dur, flag, chnls, tratio, sfID)
 	"""
-	def __init__(self, sfpath, synthname, duration=-1, uniqueID=-1, channels=1, tratio=1.0, sfID=-1):
+	def __init__(self, sfpath, synthname, duration=-1, uniqueID=-1, channels=1, tratio=1.0, sfID=-1, verb=False):
 		"""
 	
 		"""
@@ -209,12 +209,12 @@ class SamplerNode(Node):
 		"""
 		return "Sampler Node: %s (duration: %.2f, transp: %.4f)"%(self.sfpath, self.duration, self.tratio)
 
-	def verify_sf(self):
+	def verify_sf(self, verb=False):
 		# check that sfpath is a string
 		# check that it exists in the sounds dir (or a subdir) for this corpus
 		pass
 	
-	def render_json(self):
+	def render_json(self, verb=False):
 		"""
 	
 		"""
@@ -232,7 +232,7 @@ class EfxNode(Node):
 	"""
 	EfxNode(synthdef, params, parentNodeMD['duration'], flag, parentNodeMD['channels'], childID, parentID, parentNodeMD['tratio'])
 	"""
-	def __init__(self, synthname, params, duration=-1, uniqueID=-1, channels=1, tratio=1.0, childID=-1, parentID=-1):
+	def __init__(self, synthname, params, duration=-1, uniqueID=-1, channels=1, tratio=1.0, childID=-1, parentID=-1, verb=False):
 		"""
 	
 		"""
@@ -241,12 +241,11 @@ class EfxNode(Node):
 		except AttributeError:
 			print 'Atrribute Error in superclass init'
 		self.parent_id = parentID
-# 		self.hashstring = str(self.synth[0])
-		print ''
+		if verb: print ''
 		print "params: ", self.params
 		pdict = dict(zip([str(x) for x in self.params[0::2]], self.params[1::2]))
-		print ''
-		print pdict
+		if verb: print ''
+		if verb: print pdict
 		for k in pdict:
 			if (k != 'outbus') and (k != 'inbus') and (k != 'dur') and (k != 'envDur') and (k != 'transp'):
 				self.hashstring += k
@@ -258,14 +257,14 @@ class EfxNode(Node):
 	
 	def __repr__(self):
 		"""
-	
+		
 		"""
 		return "EFX Node: %s (parent id: %i, params: %s)"%(self.synth, self.parent_id, str(self.params))
 
-	def verify_synthname_and_params(self):
+	def verify_synthname_and_params(self, verb=False):
 		pass
 	
-	def render_json(self):
+	def render_json(self, verb=False):
 		"""
 	
 		"""
@@ -280,7 +279,7 @@ class EfxNode(Node):
 			'hash' : self.hashstring }
 
 class SynthNode(Node):
-	def __init__(self, synthname, params):
+	def __init__(self, synthname, params, verb=False):
 		"""
 	
 		"""
@@ -298,7 +297,7 @@ class SynthNode(Node):
 
 
 class SFU():
-	def __init__(self, onset=0, dur=0, tag=0):
+	def __init__(self, onset=0, dur=0, tag=0, verb=False):
 		self.onset = onset
 		self.dur = dur
 		self.tag = tag

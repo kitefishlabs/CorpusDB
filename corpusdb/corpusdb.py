@@ -47,7 +47,7 @@ class CorpusDB:
 	"""
 		
 	"""
-	def __init__(self, name, sudo_flag='False'):
+	def __init__(self, name, sudo_flag='False', verb=False):
 		self.anchor = name
 		self.rate = 44100
 		self.HOP_SECS = 0.04
@@ -62,7 +62,7 @@ class CorpusDB:
 		#if sudo_flag is True: resource.setrlimit(resource.RLIMIT_NOFILE, (16384, 16384)) #!!!
 		os.chdir(self.anchor) # just in case we created this corpus using a link...
 	
-	def reset_corpus(self):
+	def reset_corpus(self, verb=False):
 		
 		self.sftree = sftree.SFTree(self, self.anchor)
 		self.cutable = dict()
@@ -77,7 +77,7 @@ class CorpusDB:
 		self.dtable = dict({0: 'unitID', 1: 'parentID', 2: 'sfileID', 3: 'sfRelID', 4: 'procID', 5: 'tag',
 			6: 'onset', 7: 'duration', 8: 'tRatio'})
 		
-	def add_sound_file(self, filename=None, sfid=None, srcFileID=None, tratio=1.0, synthdef=None, params=None, procid=None, subdir=None, reuseFlag=None, importFlag=None, uflag=None):
+	def add_sound_file(self, filename=None, sfid=None, srcFileID=None, tratio=1.0, synthdef=None, params=None, procid=None, subdir=None, reuseFlag=None, importFlag=None, uflag=None, verb=False):
 		"""
 		Add a sound file to the corpus. Either a filename or an sfid must be provided.
 		"""
@@ -91,39 +91,39 @@ class CorpusDB:
 		if srcFileID is None:
 			
 			root_node = self.sftree.add_root_node(filename, sfid, tratio, procid=procid, snd_subdir=subdir, uniqueFlag=uflag)
-			print "add_root_node res: ", root_node.sfpath, ', ', root_node.sfid, ', ', root_node.tratio			
+			if verb: print "add_root_node res: ", root_node.sfpath, ', ', root_node.sfid, ', ', root_node.tratio
 			return root_node
 			
-			# print "import flag: ", importFlag, 
+			# if verb: print "import flag: ", importFlag, 
 			if importFlag: self.import_sound_file_to_buffer(root_node.sfpath, sfid)
 		
 		else:
-			#print 'ADD CHILD: ', srcFileID, ' | ', sfid, ' | ', tratio, ' | ', synthdef, ' | ', params
+			if verb: print 'ADD CHILD: ', srcFileID, ' | ', sfid, ' | ', tratio, ' | ', synthdef, ' | ', params
 			# sfid, tratio
 			child_node = self.sftree.add_child_node(srcFileID, sfid, tratio, synthdef, params, procid=procid, uniqueFlag=uflag)
-			print "add_child_node res: ", child_node.parent_id, ', ', child_node.sfid, ', ', child_node.tratio
+			if verb: print "add_child_node res: ", child_node.parent_id, ', ', child_node.sfid, ', ', child_node.tratio
 			return child_node
 		
 
-	def remove_sound_file(self, path):
+	def remove_sound_file(self, path, verb=False):
 		"""
 	
 		"""
 		return NotImplementedError
 	
-	def importSoundFileToBuffer(self, path, sfid):
+	def importSoundFileToBuffer(self, path, sfid, verb=False):
 		"""
 	
 		"""
 		return NotImplementedError
 	
-	def map_raw_sound_file(self, path, sfid, frames):
+	def map_raw_sound_file(self, path, sfid, frames, verb=False):
 		"""
 		Replaces mapBySFRelID.
 		"""
 		self.rawtable[sfid] = (path, frames)
 	
-	def _activate_raw_metadata(self, sfid):
+	def _activate_raw_metadata(self, sfid, verb=False):
 		"""
 		Returns memmap associated with this sfid, None if memmap cannot be found.
 		"""
@@ -133,16 +133,16 @@ class CorpusDB:
 			print "Error, this key (", key, ")does not have raw metadata associated with it.\nCannot activate."
 			return None
 		mdpath = pair[0]
-		print 'mdpath: ', mdpath
+		if verb: print 'mdpath: ', mdpath
 		num_frames = pair[1]
 		try:
-# 			print "RAW MAPS SHAPE: ", self.rawmaps[sfid].shape
+			if verb: print "RAW MAPS SHAPE: ", self.rawmaps[sfid].shape
 			power_vector = self.rawmaps[sfid].T[0]
 			mfccs_vector = self.rawmaps[sfid].T[1:].T
 		except KeyError:
 			#print "key errors are good..."
 			self.rawmaps[sfid] = np.memmap(mdpath, dtype=np.float32, mode='r', offset=272, shape=(num_frames, 25))
-			print "RAW MAPS SHAPE: ", self.rawmaps[sfid].shape
+			if verb: print "RAW MAPS SHAPE: ", self.rawmaps[sfid].shape
 			power_vector = self.rawmaps[sfid].T[0]
 			mfccs_vector = self.rawmaps[sfid].T[1:].T
 		self.powers[sfid] = power_vector
@@ -150,7 +150,7 @@ class CorpusDB:
 				
 		return self.powers[sfid], self.mfccs[sfid]
     
-	def _deactivate_raw_sound_file(self, sfid):
+	def _deactivate_raw_sound_file(self, sfid, verb=False):
 		"""
 		Free all raw metadata associated with the given sf id.
 		"""
@@ -163,11 +163,11 @@ class CorpusDB:
 			return None
 		return sfid
 	
-	def analyze_sound_file(self, filename, sfid, tratio=1.0, subdir=None):
+	def analyze_sound_file(self, filename, sfid, tratio=1.0, subdir=None, verb=False):
 		"""
 		Read NRT OSC score file, perform analysis asynchronously via shell, wait, signal completion and clean up.
 		"""
-		print 'file name: ', filename
+		if verb: print 'file name: ', filename
 		self.parser.anchor = self.anchor
 
 		if subdir:
@@ -200,24 +200,18 @@ class CorpusDB:
 		cmd = 'scsynth -N ' + oscpath + ' _ _ 44100 WAVE float32 -o 1'
 		args = shlex.split(cmd)
 		sppo = subprocess.Popen(args, stdout=None, stderr=None, shell=False, close_fds=True, preexec_fn=resource.setrlimit(resource.RLIMIT_NOFILE, (10000,10000)))
-		print "sppo:: ", sppo
+		if verb: print "sppo:: ", sppo
 		rc = sppo.wait()
-# 		try:
-# 			sppo.kill()
-# 		except OSError:
-# 			print "can't kill a dead proc"
-# 			pass
 
-# 		print 'PID: ', p.pid		
-		print 'RC: ', rc
+		if verb: print 'RC: ', rc
 		if rc == 1:
 			cwd = os.path.abspath(fullpath)
 			fname = string.split(os.path.basename(fullpath), '.')
 			cwd = os.path.dirname(cwd)
 			mdpath = cwd + "/md/" + fname[0] + '_' + `tratio` + '.md.' + fname[1]
-			print 'MDPATH for mapping: ', mdpath
+			if verb: print 'MDPATH for mapping: ', mdpath
 			num_frames = int(math.ceil(self.sftree.nodes[sfid].duration / self.HOP_SECS / tratio))
-			print 'num frames: ', num_frames
+			if verb: print 'num frames: ', num_frames
 			# map it:
 			self.map_raw_sound_file(mdpath, sfid, num_frames)
 			## sftrees/sfmap: handled in add_sound_file()!
@@ -225,28 +219,14 @@ class CorpusDB:
 		else:
 			print 'Analysis was not successful; failed to map raw sound file!!!'
 	
-	
-# 	def map_id_to_sf(self, path, sfid=None):
-# 		"""
-# 		Map an integer index to a sound file path. Also adds mapping from the group id ->.
-# 		"""
-# 		if sfid is not None:
-# 			id = sfid
-# 		else:
-# 			self.sf_offset += 1
-# 			id = self.sf_offset
-# 		#print "sfgmap val: ", self.sfgmap[sfgroup]
-# 
-# 		return curr_set
-		
-	def add_sound_file_unit(self, sfid, onset=0, dur=0, tag=0):
+	def add_sound_file_unit(self, sfid, onset=0, dur=0, tag=0, verb=False):
 		"""
 		In add_sound_file_unit, sfg arg is not used...
 		"""
-		print 'SFID: ', sfid, ' | onset: ', onset, ' | dur: ', dur
+		if verb: print 'SFID: ', sfid, ' | onset: ', onset, ' | dur: ', dur
 		try:
-			res = self.sftree.nodes[sfid].add_onset_and_dur_pair(onset, dur)
-			print '$$$$$$$$$$$$$ TAG: ', tag
+			res = self.sftree.nodes[sfid].add_onset_and_dur_pair(onset, dvur)
+			if verb: print '$$$$$$$$$$$$$ TAG: ', tag
 			self.sftree.nodes[sfid].update_unit_segment_params(len(self.sftree.nodes[sfid].unit_segments)-1, tag=tag)
 		except KeyError:
 			print 'Error: there is no Node for ', sfid, ' in the sf tree. Add SFU failed'
@@ -254,10 +234,10 @@ class CorpusDB:
 		self.sound_file_units_mapped = False
 		return sfid
 	
-	def _get_snd_path(self, fname):
+	def _get_snd_path(self, fname, verb=False):
 		return (self.anchor + '/snd/' + fname)
 	
-	def update_sound_file_unit(self, sfid, relid=None, onset=None, dur=None, tag=None):
+	def update_sound_file_unit(self, sfid, relid=None, onset=None, dur=None, tag=None, verb=False):
 		"""
 		Change the relid, bounds or...
 		"""
@@ -266,20 +246,20 @@ class CorpusDB:
 				self.sftree.nodes[sfid].update_unit_segment_params(relid, onset, dur, tag)
 				return sfid, relid
 			except KeyError:
-				'Error: there is no entry for ', sfid, ' in the sf map. Update SFU failed.'
+				print 'Error: there is no entry for ', sfid, ' in the sf map. Update SFU failed.'
 				return None
 			except IndexError:
-				'Error: ', relid, ' is a bad relid for sfid ', sfid, '.'
+				print 'Error: ', relid, ' is a bad relid for sfid ', sfid, '.'
 				return None
 	
-	def remove_sound_file_unit(self, sfid, path=None, relid=None, bounds=None):
+	def remove_sound_file_unit(self, sfid, path=None, relid=None, bounds=None, verb=False):
 		"""
 		Remove all internal mappings for a given sfid/path.
 		"""
 		if self.sftree.nodes[sfid].unit_segments[relid] is not None:
 			del self.sftree.nodes[sfid].unit_segments[relid]		
 	
-	def clear_sound_file_units(self, sfid):
+	def clear_sound_file_units(self, sfid, verb=False):
 		"""
 		Remove all references to all sound file units.
 		"""		
@@ -291,7 +271,7 @@ class CorpusDB:
 			return None
 		return sfid
 		
-	def get_raw_metadata(self, sfid):
+	def get_raw_metadata(self, sfid, verb=False):
 		"""
 		Return scalars, vectors, activation layer, and cooked layer in that order. Calls _activate_raw_metadata, if necessary.
 		Note that this function is only going to work when there is raw analyzed metadata. To get the segmentsed
@@ -301,13 +281,13 @@ class CorpusDB:
 		except KeyError:
 			return self._activate_raw_metadata(sfid) # now self.rawmaps[sfid] should exist or res == None if not
 	
-	def get_sorted_units_list(self, sfid):
+	def get_sorted_units_list(self, sfid, verb=False):
 		"""
 		
 		"""
 		return self.sftree.nodes[sfid].sort_segments_list()
 	
-	def segment_units(self, sfid):
+	def segment_units(self, sfid, verb=False):
 		"""
 		With all due respect to Mr. Levi-Strauss...
 		
@@ -320,16 +300,16 @@ class CorpusDB:
 		raw_amps, raw_mfccs = self._activate_raw_metadata(sfid)
 		amps , reheated = [], []
 		
-# 		print 'raw: ', raw_amps
+		if verb: print 'raw: ', raw_amps
 		amps_stripped = np.nan_to_num(raw_amps)
-# 		print 'amps_stripped: ', amps_stripped
+		if verb: print 'amps_stripped: ', amps_stripped
 		mfccs_stripped = np.nan_to_num(raw_mfccs)
 		
 		for relid, sfu in enumerate(segmented):
 
 			offset = int(math.floor(sfu.onset / self.HOP_SECS))
 			dur = int(math.floor(sfu.dur / self.HOP_SECS))
-			print '[[', offset, '|', dur, ']]'
+			if verb: print '[[', offset, '|', dur, ']]'
 			#amps += [self.analyze_scalar(amps_stripped, offset, dur)]
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, amps=self.analyze_scalar(amps_stripped, offset, dur))
 			#reheated += [np.mean(mfccs_stripped[offset:(offset+dur)], axis=0, dtype=np.float32)]
@@ -337,23 +317,23 @@ class CorpusDB:
 		
 	# [MEAN, MAX, LVAL, RVAL, SLOPE]
 	# offset and dur are in frames
-	def analyze_scalar(self, raw_stripped, offset, dur):
- 		# print "offset: ", offset
- 		# print "dur: ", dur
- 		# print raw_stripped.shape
+	def analyze_scalar(self, raw_stripped, offset, dur, verb=False):
+ 		if verb: print "offset: ", offset
+ 		if verb: print "dur: ", dur
+ 		if verb: print raw_stripped.shape
 		chopped = raw_stripped[offset:(offset+dur)]
- 		# print np.mean(chopped)
- 		# print np.mean(chopped[-2:])
+ 		if verb: print np.mean(chopped)
+ 		if verb: print np.mean(chopped[-2:])
 		mn = np.mean(chopped)
 		max = np.max(chopped).tolist()
 		l_val = np.mean(chopped[:2])
 		r_val = np.mean(chopped[-2:])
 		slope = (r_val - l_val) / float(dur)
- 		# print [mn, max, l_val, r_val]
+ 		if verb: print [mn, max, l_val, r_val]
 		return [(math.log10(x) * 20.0) if x > 0.000001 else -120 for x in [mn, max, l_val, r_val]] + [slope]
 
 	# test me
-	def add_corpus_unit(self, uid, metadata):
+	def add_corpus_unit(self, uid, metadata, verb=False):
 		"""
 	
 		"""
@@ -361,7 +341,7 @@ class CorpusDB:
 		self.cutable[uid] = metadata
 
 	# test me
-	def remove_corpus_unit(self, cid):
+	def remove_corpus_unit(self, cid, verb=False):
 		"""
 		Remove a units from the corpus units table.	
 		"""
@@ -371,7 +351,7 @@ class CorpusDB:
 			print 'Error: attempting to remove corpus unit that does not exist at index ', cid, '.'
 	
 	# test me
-	def clear_corpus_units(self):
+	def clear_corpus_units(self, verb=False):
 		"""
 		Remove all units from the corpus units table.
 		"""
@@ -379,33 +359,20 @@ class CorpusDB:
 			self.cutable[k] = None
 	
 	# test me
-# 	def _lookup_sfid(self, path, transp):
-# 		"""
-# 		Look up id by querying path in sfmap table.
-# 		"""
-# 		try:
-# 			
-# 			sfid = self.sfmap[path]
-# 		except KeyError:
-# 			print 'Error: there is no entry for ', path, ' in the sf map. Lookup SFID failed.'
-# 			return None
-# 		return sfid
-
-	# test me
-	def get_sound_file_unit_metadata(self, sfid):
+	def get_sound_file_unit_metadata(self, sfid, verb=False):
 		"""
 		Get the metadata rows for all units associated with a sound file.
 		"""
 		return sorted([entry for entry in self.cutable if entry[2] == sfid], key = lambda row: row[0])
 	
-	def map_sound_file_units_to_corpus_units(self):
+	def map_sound_file_units_to_corpus_units(self, verb=False):
 		"""
 		Build the corpus unit table from entries found in the sound file unit table.
 		"""
 		print "map sound file units to corpus units"
 		self.clear_corpus_units()
-# 		print '---------------------------------'
-		print self.sftree.nodes.keys()
+		if verb: print '---------------------------------'
+		if verb: print self.sftree.nodes.keys()
 		for node in self.sftree.nodes.keys():
 			sf_id = self.sftree.nodes[node].sfid
 			sf_tratio = self.sftree.nodes[node].tratio
@@ -424,12 +391,11 @@ class CorpusDB:
 					mfccs_segment = self.sftree.nodes[node].unit_mfccs[k]
 					index = self.cu_offset
 					
-# 					print '@ relid: ', sf_unit_segments[relid].onset
-					# dict({0: 'unitID', 1: 'parentID', 2: 'sfileID', 3: 'sfRelID', 4: 'procID', 5: 'tag', 6: 'onset', 7: 'duration', 8: 'tRatio'})
+					if verb: print '@ relid: ', sf_unit_segments[relid].onset
 					row = np.array([index, parent_id, sf_id, relid, sf_proc_id, sf_unit_segments[relid].tag, sf_unit_segments[relid].onset, sf_unit_segments[relid].dur, sf_tratio])
-#  					print 'row: ', row.shape
-#  					print 'amp segment: ', amp_segment
-#  					print 'mfccs segment: ', mfccs_segment
+					if verb: print 'row: ', row.shape
+					if verb: print 'amp segment: ', amp_segment
+					if verb: print 'mfccs segment: ', mfccs_segment
 					self.add_corpus_unit(index, np.concatenate([row, amp_segment, mfccs_segment]))
 					relid += 1
 					self.cu_offset += 1
@@ -441,7 +407,7 @@ class CorpusDB:
 				raise
 
 	# types: 0 = all, 1 = SamplerNodes, 2 = EfxNodes
-	def convert_sftree_nodes_to_array(self, type=0):
+	def convert_sftree_nodes_to_array(self, type=0, verb=False):
 		keys = sorted(list(self.sftree.nodes.keys()))
 		nodes = []	
 		for k in keys:
@@ -462,7 +428,7 @@ class CorpusDB:
 	#	[0 1 2 3 4 5 6 7 8] [9 10 11 12 13] [14 15 16 17 ... 37]
 	#
 	
-	def convert_corpus_to_array(self, type='all', map_flag=False):
+	def convert_corpus_to_array(self, type='all', map_flag=False, verb=False):
 		"""
 		Convert the corpus unit table to a three compacted arrays: power metadata and MFCC metadata.
 		"""
@@ -481,7 +447,7 @@ class CorpusDB:
 		elif type is 'all':	return np.c_[X[:,0], X]
 		else:				raise ArgumentError
 	
-	def convert_corpus_to_tagged_array(self, type='all', tag=0.0, map_flag=False):
+	def convert_corpus_to_tagged_array(self, type='all', tag=0.0, map_flag=False, verb=False):
 		"""
 		Convert the corpus unit table to a three compacted arrays: power metadata and MFCC metadata.
 		"""
@@ -501,10 +467,10 @@ class CorpusDB:
 # 		return np.append(indices, filtered_by_tag, axis=1)
 		return filtered_by_tag
 	
-	def cuids_for_sfid(self, seed_sfid):
+	def cuids_for_sfid(self, seed_sfid, verb=False):
 		return [int(self.cutable[entry][0]) for entry in self.cutable.keys() if self.cutable[entry][2] == seed_sfid]
 			
-	def import_corpus_from_json(self, jsonfilename, appendflag=False, newanchor=None, importflag=False):
+	def import_corpus_from_json(self, jsonfilename, appendflag=False, newanchor=None, importflag=False, verb=False):
 		"""
 		Create a corpus from a json file.
 		Append flag??? Should it be removed as a parameter.
@@ -528,7 +494,7 @@ class CorpusDB:
 		# warn user if conflicting anchor path?
 		
 		current_procmap_offset = self.sftree.procmap_offset
-		print "current_procmap_offset: ", current_procmap_offset
+		if verb: print "current_procmap_offset: ", current_procmap_offset
 		
 		procmap = j['procmap']
 		for key in sorted(procmap.keys()):
@@ -539,7 +505,7 @@ class CorpusDB:
 			sf = soundfiles[str(key)]
 			
 			procid = [int(k) for k,v in procmap.iteritems() if v == sf['hash']][0]
-			print "k procid result: ", procid
+			if verb: print "k procid result: ", procid
 			# print sf
 			
 			try:
@@ -567,42 +533,42 @@ class CorpusDB:
 		corpusunits = j['corpusunits']
 		print "proc map offset: ", self.sftree.procmap_offset
 		for key in sorted([int(x) for x in list(corpusunits.keys())] ):
- 			print '-----------------------'
-# 			print type(key)
- 			print corpusunits[str(key)]
+ 			if verb: print '-----------------------'
+			if verb: print type(key)
+ 			if verb: print corpusunits[str(key)]
 			cunit = corpusunits[str(key)]
 			try:
 				cunit = [float(x) for x in cunit.strip('[]').split(',')]
 			except AttributeError:
 				cunit = corpusunits[str(key)]
-# 			print "cunit: ", cunit
+			if verb: print "cunit: ", cunit
 			cunit[0] += self.cu_offset
-# 			print "cunit[0]: ", cunit[0]
+			if verb: print "cunit[0]: ", cunit[0]
 			cunit[1] += current_procmap_offset
-# 			print "cunit[1]: ", cunit[1]
+			if verb: print "cunit[1]: ", cunit[1]
 			cunit[2] += self.sf_offset
-# 			print "cunit[2]: ", cunit[2]
+			if verb: print "cunit[2]: ", cunit[2]
 			self.add_corpus_unit(int(key) + self.cu_offset, cunit)
 		
 		self.sf_offset = max(self.sftree.nodes.keys()) + 1
-		print 'UPDATE max sfid --> sf_offset: ', self.sf_offset
+		if verb: print 'UPDATE max sfid --> sf_offset: ', self.sf_offset
 		self.cu_offset = max(self.cutable.keys()) + 1
-		print 'UPDATE max cutable key --> cu_offset: ', self.cu_offset
+		if verb: print 'UPDATE max cutable key --> cu_offset: ', self.cu_offset
 		self.sftree.procmap_offset = max(self.sftree.procmap.keys()) + 1
-		
+
 		f.close()
 		
 	
-	def export_corpus_to_json(self, jsonfilename):
+	def export_corpus_to_json(self, jsonfilename, verb=False):
 		"""
 		
 		"""
 		jsonpath = os.path.join(self.anchor, 'json', jsonfilename)		
 		f = open(jsonpath, 'w')
 		# don't forget the descriptors...
-# 		print ''
-# 		print self.sftree.procmap
-# 		print ''
+		if verb: print ''
+		if verb: print self.sftree.procmap
+		if verb: print ''
 		toplevel = { 'descriptors': self.dtable, 'anchorpath': self.anchor, 'procmap': self.sftree.procmap }
 		sf = dict()
 		for sfid in self.sftree.nodes.keys():
@@ -610,10 +576,9 @@ class CorpusDB:
 		toplevel['soundfiletree'] = sf
 		# roll the cutable rows into dictionary
 		d = dict()
-		# print 'keys: ', self.cutable.keys()
+		if verb: print 'keys: ', self.cutable.keys()
 		for cid in sorted(list(self.cutable.keys())):
-			# print 'cutable entry: ', type(self.cutable[cid])
-# 			clist = [("%.5f" % c) if (type(c) == type(1.1)) else str(c) for c in self.cutable[cid].tolist() ]
+			if verb: print 'cutable entry: ', type(self.cutable[cid])
 			d[str(cid)] = json.dumps(self.cutable[cid].tolist())
 		toplevel['corpusunits'] = d
 		
