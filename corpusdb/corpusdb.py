@@ -225,7 +225,7 @@ class CorpusDB:
 		"""
 		if verb: print 'SFID: ', sfid, ' | onset: ', onset, ' | dur: ', dur
 		try:
-			res = self.sftree.nodes[sfid].add_onset_and_dur_pair(onset, dvur)
+			res = self.sftree.nodes[sfid].add_onset_and_dur_pair(onset, dur)
 			if verb: print '$$$$$$$$$$$$$ TAG: ', tag
 			self.sftree.nodes[sfid].update_unit_segment_params(len(self.sftree.nodes[sfid].unit_segments)-1, tag=tag)
 		except KeyError:
