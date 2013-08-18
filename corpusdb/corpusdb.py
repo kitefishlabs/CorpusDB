@@ -199,10 +199,17 @@ class CorpusDB:
 
 		cmd = 'scsynth -N ' + oscpath + ' _ _ 44100 WAVE float32 -o 1'
 		args = shlex.split(cmd)
-		rc = subprocess.call(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, close_fds=True)
-		
+		sppo = subprocess.Popen(args, stdout=None, stderr=None, shell=False, close_fds=True, preexec_fn=resource.setrlimit(resource.RLIMIT_NOFILE, (10000,10000)))
+		print "sppo:: ", sppo
+		rc = sppo.wait()
+# 		try:
+# 			sppo.kill()
+# 		except OSError:
+# 			print "can't kill a dead proc"
+# 			pass
+
 # 		print 'PID: ', p.pid		
-# 		print 'RC: ', rc
+		print 'RC: ', rc
 		if rc == 1:
 			cwd = os.path.abspath(fullpath)
 			fname = string.split(os.path.basename(fullpath), '.')
@@ -322,24 +329,27 @@ class CorpusDB:
 
 			offset = int(math.floor(sfu.onset / self.HOP_SECS))
 			dur = int(math.floor(sfu.dur / self.HOP_SECS))
-			#print '[[', offset, '|', dur, ']]'
+			print '[[', offset, '|', dur, ']]'
 			#amps += [self.analyze_scalar(amps_stripped, offset, dur)]
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, amps=self.analyze_scalar(amps_stripped, offset, dur))
 			#reheated += [np.mean(mfccs_stripped[offset:(offset+dur)], axis=0, dtype=np.float32)]
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, mfccs=np.mean(mfccs_stripped[offset:(offset+dur)], axis=0, dtype=np.float32))
 		
 	# [MEAN, MAX, LVAL, RVAL, SLOPE]
+	# offset and dur are in frames
 	def analyze_scalar(self, raw_stripped, offset, dur):
-# 		print "dur: ", dur
+ 		# print "offset: ", offset
+ 		# print "dur: ", dur
+ 		# print raw_stripped.shape
 		chopped = raw_stripped[offset:(offset+dur)]
-# 		print np.mean(chopped[:2])
-# 		print np.mean(chopped[-2:])
+ 		# print np.mean(chopped)
+ 		# print np.mean(chopped[-2:])
 		mn = np.mean(chopped)
 		max = np.max(chopped).tolist()
 		l_val = np.mean(chopped[:2])
 		r_val = np.mean(chopped[-2:])
 		slope = (r_val - l_val) / float(dur)
-# 		print [mn, max, l_val, r_val]
+ 		# print [mn, max, l_val, r_val]
 		return [(math.log10(x) * 20.0) if x > 0.000001 else -120 for x in [mn, max, l_val, r_val]] + [slope]
 
 	# test me
@@ -399,7 +409,7 @@ class CorpusDB:
 		for node in self.sftree.nodes.keys():
 			sf_id = self.sftree.nodes[node].sfid
 			sf_tratio = self.sftree.nodes[node].tratio
-			sf_proc_id = [k for k,v in self.sftree.procmap.iteritems if v == self.sftree.nodes[node].hashstring][0]
+			sf_proc_id = [k for k,v in self.sftree.procmap.iteritems() if v == self.sftree.nodes[node].hashstring][0]
 			try:
 				parent_id = self.sftree.nodes[node].parent_id
 			except AttributeError:

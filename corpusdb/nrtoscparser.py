@@ -84,7 +84,7 @@ class NRTOSCParser:
 			total_length += len(footer)
 			
 			f.write(footer)
-	
+			f.close()
 	
 	
 	def createNRTScore(self, sfpath = '/Users/me/corpus/snd/76444.wav',
