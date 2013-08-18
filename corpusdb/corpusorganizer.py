@@ -23,6 +23,7 @@ class WeightedRandomGenerator(object):
 	"""
 	def __init__(self, weights=[(1.0 - float(x / 10000.0)) for x in range(10000)]):
 		self.totals = []
+		self.weights = weights
 		running_total = 0
 		self.size = len(weights)
 
@@ -34,7 +35,7 @@ class WeightedRandomGenerator(object):
 		rnd = random.random() * self.totals[-1]
 		return int(bisect.bisect_right(self.totals, rnd) / float(self.size) * ulimit)
 
-	def __call__(self, ulimit=100): return self.next()
+	def __call__(self, ulimit=100): return self.next(ulimit)
 
 
 class CorpusTracker:
@@ -146,7 +147,7 @@ class CorpusTracker:
 		if type is 'urg':
 			self.rg = UniformRandomGenerator()
 		elif type is 'wrg':
-			weights = [float(x / float(size)) for x in range(size)]
+			weights = [((1.0-(float(x/float(size))))**2.0) for x in range(size)]
 			self.rg = WeightedRandomGenerator(weights)
 		return self.rg
 	
