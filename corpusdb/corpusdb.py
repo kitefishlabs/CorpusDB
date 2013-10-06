@@ -55,7 +55,7 @@ class CorpusDB:
 		
 		self.reset_corpus()
 				
-		self.parser = nrtoscparser.NRTOSCParser()
+		self.parser = nrtoscparser.NRTOSCParser(self)
 			
 		self.sound_file_units_mapped = False
 		
@@ -176,7 +176,7 @@ class CorpusDB:
 			fullpath = os.path.join(self.anchor, 'snd', filename)
 
 		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(filename)[0] + '_' + `tratio` + '_power_mfcc24Analyzer.osc'))
-		#print 'create nrt score args: ', fullpath, ' ', oscpath
+		if verb: print 'create nrt score args: ', fullpath, ' ', oscpath
 		#print sfid, ' '	, tratio, ' ', self.rate, ' ', self.sftree.nodes[sfid].duration, ' ', oscpath
 		
 		try:
@@ -189,7 +189,7 @@ class CorpusDB:
 			efx_synth = None
 			efx_params = None
 		# print "### ", synthid, '\n', self.sftree.sfmap[sfid][0], '\n', self.sftree.sfmap[sfid][1]
-		self.parser.createNRTScore(fullpath, 
+		self.parser.createNRTAnalysisScore(fullpath, 
 									tratio=tratio, 
 									duration=self.sftree.nodes[sfid].duration, 
 									oscDir=oscpath, 
@@ -455,7 +455,9 @@ class CorpusDB:
 		# get the info segments and filter those that are tagged
 		info = self.convert_corpus_to_array('I', map_flag)
 		
-		indices = np.argwhere(info[:,8]==tag)
+		print info.shape
+		
+		indices = np.argwhere(info[:,5]==tag)
 # 		indices = np.reshape(indices, (indices.shape[0],))
 
 		# use the tagged indices to pull out the tagged entries
@@ -510,9 +512,9 @@ class CorpusDB:
 			
 			try:
 				pid = sf['parentID']
-				print ">>> params: ", sf['params']
+				# print ">>> params: ", sf['params']
 				params = [[str(p) if (type(p) == type(u'')) else p for p in sf['params']]]
-				print ">>> params: ", params
+				# print ">>> params: ", params
 				
 				sfid = self.add_sound_file(filename=None, 
 												sfid=(sf['sfID'] + self.sf_offset), 
@@ -531,7 +533,7 @@ class CorpusDB:
 											uflag=sf['uniqueID'])
 						
 		corpusunits = j['corpusunits']
-		print "proc map offset: ", self.sftree.procmap_offset
+		# print "proc map offset: ", self.sftree.procmap_offset
 		for key in sorted([int(x) for x in list(corpusunits.keys())] ):
  			if verb: print '-----------------------'
 			if verb: print type(key)
