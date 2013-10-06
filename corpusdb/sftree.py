@@ -242,7 +242,7 @@ class EfxNode(Node):
 			print 'Atrribute Error in superclass init'
 		self.parent_id = parentID
 		if verb: print ''
-		print "params: ", self.params
+		# print "params: ", self.params
 		pdict = dict(zip([str(x) for x in self.params[0::2]], self.params[1::2]))
 		if verb: print ''
 		if verb: print pdict
