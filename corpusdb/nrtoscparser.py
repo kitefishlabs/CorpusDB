@@ -18,6 +18,7 @@ __email__ = 'tms@kitefishlabs.com'
 
 
 import sc, time, struct, math, os, string
+import numpy as np
 from scosc import OSC
 from scosc import tools
 from scosc import osctools
@@ -26,8 +27,8 @@ class NRTOSCParser:
 	"""
 	anchor = corpus anchor (directory where corpus resides)
 	"""
-	def __init__(self, anchor=''):
-		self.anchor = anchor
+	def __init__(self, crps):
+		self.corpus = crps
 	
 	def absToOSCTimestamp(self, abs):
 		return struct.pack('!LL', math.floor(abs), long(float(abs - long(abs)) * 4294967296L))
@@ -45,6 +46,7 @@ class NRTOSCParser:
 			return struct.pack('!f', val)
 
 	def processAndWriteFile(self, score, output):
+		#print "score: ", score
 		header = bytearray("\x00\x00\x00$#bundle\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x10/g_new\x00\x00,i\x00\x00\x00\x00\x00\x01\x00\x00\x00$#bundle\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x10/g_new\x00\x00,i\x00\x00\x00\x00\x00\x01")
 		total_length = 0
 		with open(output, 'wb') as f:
@@ -69,8 +71,10 @@ class NRTOSCParser:
 						types += 'f'
 				types = self.padBytes(types)
 				bundle.extend(types)
+				#print 'bundle: ', bundle
 				for item in commands[1:]:
 						translated = self.padBytes(item)
+						#print 'translated:: ', translated
 						bundle.extend(translated)
 				total_length += len(bundle)
 				bundle[3] = len(bundle) - 4
@@ -87,7 +91,7 @@ class NRTOSCParser:
 			f.close()
 	
 	
-	def createNRTScore(self, sfpath = '/Users/me/corpus/snd/76444.wav',
+	def createNRTAnalysisScore(self, sfpath = '/Users/me/corpus/snd/76444.wav',
 						pBuf = 10,
 						aBuf = 11,
 						tratio = 1.0,
@@ -169,6 +173,96 @@ class NRTOSCParser:
 		# pass the osc list to function that writes binary .osc file
 		self.processAndWriteFile(oscList, oscDir)
 		# always return pwd to the anchor dir
-		os.chdir(self.anchor)
+		os.chdir(self.corpus.anchor)
+
+
+	def createNRTAssemblyScore(self, 
+						triosList,
+						oscDir = '/Users/me/corpus/snd/score.osc'):
+		"""
+		args:
+			triosList		-	np list of [sfid, onset, duration] trios
+			oscDir			-	path to dir where SC .osc files are saved (.../corpus/osc/ by convention)
+		"""	
+		
+		## the buffer alloc calls
+		
+		sfsToUse = np.unique(np.array(triosList[:,0], dtype='int32'))
+		sfPaths = [self.corpus.sftree.nodes[sfid].sfpath for sfid in sfsToUse]
+		# filter any duplicate (parent-->child) sound files before the alloc stage???!!!
+		#oscList = [[0, ["/b_alloc", 0, np.sum(triosList[:,2]), 2]], [0.01, []]]
+		oscList = []
+		runningbuffertotal = 1
+		
+		# now build a dict with the synthdefs and params for each sfid
+		sfInfo = dict()
+		for i,sfid in enumerate(sfsToUse):
+			try:
+				node = self.corpus.sftree.nodes[sfid]
+				sfInfo[sfid] = {
+					'bufnum' : runningbuffertotal,
+					'sfpath' : (self.corpus.anchor + '/snd/' + node.sfpath),
+					'synthdef': [node.synth],
+					'params' : None,
+					'tratio' : node.tratio}
+				oscList += [[0.0, ["/b_allocRead", runningbuffertotal, (self.corpus.anchor + '/snd/' + sfpth), 0, -1]] for sfpth in sfPaths]
+				runningbuffertotal += 1
+			
+			# if the first .sfpath throws an Error, then we have a child node!
+			except AttributeError:
+				print "@@@TO DO!!! : handle child nodes!"
+				pass
+				# 				parentnode = self.corpus.sftree.nodes[ self.corpus.sftree.nodes[sfid].parent_id ]
+				# 				childnode = self.corpus.sftree.nodes[ sfid ]
+				# 				sfInfo[sfid] = dict(
+				# 					'sfpath' : parentnode.sfpath,
+				# 					'onset': triosList[i,1],
+				# 					'dur': triosList[i,2],
+				# 					'synthdefs' : [parentnode.synth, childnode.synth],
+				# 					'params' : [None, childnode.params],
+				# 					'tratio' : self.corpus.sftree.nodes[sfid].tratio)
+		print sfInfo
+		print oscList
+		runningdur = 0
+		for segment in triosList:
+			sfid = segment[0]
+			#print 'sfid: ', type(sfid)
+			offset = segment[1]
+			dur = segment[2]
+			#print type(offset)
+			#print type(dur)
+			print "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+			print sfInfo[sfid]['synthdef'][0]
+			print int(sfid)
+			print float(offset)
+			print float(dur)
+			print sfInfo[sfid]['tratio']
+			print "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+			oscList += [[(0.01+runningdur), ["/s_new", 
+				sfInfo[sfid]['synthdef'][0], 
+				-1, 
+				0, 
+				0, 
+				'srcbufNum', 
+				int(sfInfo[sfid]['bufnum']), 
+				'outbus', 
+				0, 
+				'start', 
+				float(offset), 
+				'dur', 
+				float(dur), 
+				'transp', 
+				sfInfo[sfid]['tratio']]]]
+			runningdur += (dur - 0.01)
+		
+		oscList += [[(runningdur + 0.02), ["/c_set", 0, 0]]]
+
+		print "======================"
+		print oscList
+				
+		# pass the osc list to function that writes binary .osc file
+		self.processAndWriteFile(oscList, oscDir)
+		# always return pwd to the anchor dir
+		os.chdir(self.corpus.anchor)
 
 

@@ -101,48 +101,65 @@ class CorpusTracker:
 	
 	# track storage?
 	
-	def rank_units_by_euc_dist(self, targets_mfccs, pool_mfccs, depth=1000, varflag=False):
+	def rank_units_by_euc_dist(self, target_mfccs, pool_mfccs, depth=1000, varflag=False):
 		id_ranking = np.array([], dtype='int32')
-		for i in range(targets_mfccs[:,0].shape[0]):
+		print "shape: ", target_mfccs.shape[0] # [:,0]
+		for i in range(target_mfccs.shape[0]):
 			# calculate dists:
 			if varflag is True:
-				diffs_squared = np.square(np.subtract(np.atleast_2d(targets_mfccs[i,1:]), pool_mfccs[:,1:]))
+				diffs_squared = np.square(np.subtract(np.atleast_2d(target_mfccs[i,1:]), pool_mfccs[:,1:]))
 				similarities = np.reshape(np.sum(np.multiply(diffs_squared, self.mfccs_vars), axis=1), (-1,1))
 			else:
-				similarities = np.reshape(distance.euc2(np.atleast_2d(targets_mfccs[i,1:]), pool_mfccs[:,1:]), (-1,1))
+				print target_mfccs[i,1:].shape
+				print pool_mfccs[:,1:].shape
+				similarities = np.reshape(distance.euc2(np.atleast_2d(target_mfccs[i,1:]), pool_mfccs[:,1:]), (-1,1))
 			# sorted dists' indices:
 			similarities = np.argsort(similarities, axis=None)[:depth]			
 			id_ranking = np.append(np.atleast_2d(id_ranking), pool_mfccs[similarities][:,0])
-		return np.reshape(id_ranking, (-1, depth))
+			print "id ranking shape:", id_ranking.shape
+		return np.reshape(id_ranking, (-1, min(depth, id_ranking.shape[0])))
 
 	# [:,1:] ???
-	def rerank_units_by_concat_cost(self, t_minus_one_mfccs, prosp_mfccs):
+	def rerank_units_by_concat_cost(self, t_minus_one_mfccs, pool_mfccs):
 # 		print t_minus_one_mfccs.shape
-# 		print prosp_mfccs.shape
-		costs = np.reshape(distance.euc2(np.atleast_2d(t_minus_one_mfccs[1:]), prosp_mfccs[:,1:]), (-1,1))
+# 		print pool_mfccs.shape
+		costs = np.reshape(distance.euc2(np.atleast_2d(t_minus_one_mfccs[1:]), pool_mfccs[:,1:]), (-1,1))
 		costs = np.argsort(costs, axis=None)
 		costs = np.asarray(costs, dtype='int32')
-		return np.asarray(prosp_mfccs[costs][:,0], dtype='int32')
+		return np.asarray(pool_mfccs[costs][:,0], dtype='int32')
 	
 
-	def rerank_units_by_amp(self, target_amp, prosp_amps):
-		diffs = np.reshape(distance.euc2(np.atleast_2d(target_amp), np.atleast_2d(prosp_amps[:,1]).T), (-1,1))
+	def rerank_units_by_amp(self, target_amp, pool_amps):
+		diffs = np.reshape(distance.euc2(np.atleast_2d(target_amp), np.atleast_2d(pool_amps[:,1]).T), (-1,1))
 		diffs = np.argsort(diffs, axis=None)
 		diffs = np.asarray(diffs, dtype='int32')
-		return np.asarray(prosp_amps[diffs][:,0], dtype='int32')
+		return np.asarray(pool_amps[diffs][:,0], dtype='int32')
 	
-	def rerank_units_by_amp_continuity(self, target_amp_t_minus_1, prosp_amps, target_amp_t_plus_1):
+	def rerank_units_by_amp_continuity(self, target_amp_t_minus_1, pool_amps, target_amp_t_plus_1):
 		avg_amp = (target_amp_t_minus_1 + target_amp_t_plus_1) / 2.0
-		return self.rerank_units_by_amp(avg_amp, prosp_amps)
+		return self.rerank_units_by_amp(avg_amp, pool_amps)
 
-	
-	def filter_units_by_amp_threshold(self, targets, ranked_ids, limit=25, db_threshold=-3):
+	"""
+	targets		-	
+	ranked_ids	-	
+	limit		-	max number of units to return
+	"""
+	def filter_units_by_amp_threshold_old(self, targets, ranked_ids, limit=25, db_threshold=-3):
 # 		self.uni_wrg = UniformWRG(hi=limit)
 		ranked_with_amps_gt = []
 		for i in range(targets.shape[0]):
+			print "> ", targets[i]
 			ranked_with_amps_gt += np.reshape(ranked_ids[0][self.amps_greater_than(ranked_ids[i,:], targets[i], fudge=db_threshold)], (1,-1))[:,:limit].tolist()
 		return ranked_with_amps_gt
-	
+
+	def filter_units_by_amp_threshold_old(self, targets, ranked_ids, limit=25, db_threshold=-3):
+# 		self.uni_wrg = UniformWRG(hi=limit)
+		ranked_with_amps_gt = []
+		for i in range(targets.shape[0]):
+			print "> ", targets[i]
+			ranked_with_amps_gt += np.reshape(ranked_ids[0][self.amps_greater_than(ranked_ids[i,:], targets[i], fudge=db_threshold)], (1,-1))[:,:limit].tolist()
+		return ranked_with_amps_gt
+		
 	def select_rg(self, type='urg', size=100):
 		if type is 'urg':
 			self.rg = UniformRandomGenerator()
