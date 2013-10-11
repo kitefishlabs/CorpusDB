@@ -457,7 +457,7 @@ class CorpusDB:
 		
 		print info.shape
 		
-		indices = np.argwhere(info[:,5]==tag)
+		indices = np.argwhere(info[:,6]==tag)
 # 		indices = np.reshape(indices, (indices.shape[0],))
 
 		# use the tagged indices to pull out the tagged entries

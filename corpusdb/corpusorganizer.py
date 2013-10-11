@@ -83,8 +83,7 @@ class CorpusTracker:
 	def all_parentids(self):
 		return np.unique(np.asarray(self.ids, dtype='int32')[:,2])
 	
-	# Amp-constraint functions
-	
+	# 2. Amp-constraint functions
 	def amps_greater_than(self, subset_ids, threshold_unit, fudge=-3):
 		
 		thresh_amp = 10.0 ** (self.amps[threshold_unit,1] / 20.0)
@@ -97,40 +96,41 @@ class CorpusTracker:
 		subset_ids = np.reshape(np.argwhere(subset_amps[:,1]>db_lower_bound), (-1,1))
 		return subset_ids # np.asarray(subset_amps[subset_ids][:,0], dtype='int32')
 
-	# higher-level access functions?
-	
+	# higher-level access functions?	
 	# track storage?
 	
+	# 3. Ranking and reranking functions
 	def rank_units_by_euc_dist(self, target_mfccs, pool_mfccs, depth=1000, varflag=False):
 		id_ranking = np.array([], dtype='int32')
 		print "shape: ", target_mfccs.shape[0] # [:,0]
 		for i in range(target_mfccs.shape[0]):
 			# calculate dists:
 			if varflag is True:
-				diffs_squared = np.square(np.subtract(np.atleast_2d(target_mfccs[i,1:]), pool_mfccs[:,1:]))
-				similarities = np.reshape(np.sum(np.multiply(diffs_squared, self.mfccs_vars), axis=1), (-1,1))
+				diffs_squared = np.square(np.subtract(np.atleast_2d(target_mfccs[i,3:16]), pool_mfccs))
+				similarities = np.reshape(np.sum(np.multiply(diffs_squared, self.mfccs_vars[:,3:16]), axis=1), (-1,1))
 			else:
-				print target_mfccs[i,1:].shape
-				print pool_mfccs[:,1:].shape
-				similarities = np.reshape(distance.euc2(np.atleast_2d(target_mfccs[i,1:]), pool_mfccs[:,1:]), (-1,1))
+				print target_mfccs[i,3:16].shape
+				print pool_mfccs[:,3:16].shape
+				similarities = np.reshape(distance.euc2(np.atleast_2d(target_mfccs[i,3:16]), pool_mfccs[:,3:16]), (-1,1))
 			# sorted dists' indices:
-			similarities = np.argsort(similarities, axis=None)[:depth]			
+			print "similarities before shape:", similarities.shape
+			similarities = np.argsort(similarities, axis=None)[:depth]
+			print "similarities shape:", similarities
 			id_ranking = np.append(np.atleast_2d(id_ranking), pool_mfccs[similarities][:,0])
-			print "id ranking shape:", id_ranking.shape
+			print "pool_mfccs[similarities]: ", pool_mfccs[similarities].shape
+			print "\n\nid ranking shape:", id_ranking, "\n\n"
 		return np.reshape(id_ranking, (-1, min(depth, id_ranking.shape[0])))
 
-	# [:,1:] ???
 	def rerank_units_by_concat_cost(self, t_minus_one_mfccs, pool_mfccs):
 # 		print t_minus_one_mfccs.shape
 # 		print pool_mfccs.shape
-		costs = np.reshape(distance.euc2(np.atleast_2d(t_minus_one_mfccs[1:]), pool_mfccs[:,1:]), (-1,1))
+		costs = np.reshape(distance.euc2(np.atleast_2d(t_minus_one_mfccs[:,3:16]), pool_mfccs[:,3:16]), (-1,1))
 		costs = np.argsort(costs, axis=None)
-		costs = np.asarray(costs, dtype='int32')
 		return np.asarray(pool_mfccs[costs][:,0], dtype='int32')
 	
 
 	def rerank_units_by_amp(self, target_amp, pool_amps):
-		diffs = np.reshape(distance.euc2(np.atleast_2d(target_amp), np.atleast_2d(pool_amps[:,1]).T), (-1,1))
+		diffs = np.reshape(distance.euc2(np.atleast_2d(target_amp)[:,3:16], np.atleast_2d(pool_amps[:,1]).T), (-1,1))
 		diffs = np.argsort(diffs, axis=None)
 		diffs = np.asarray(diffs, dtype='int32')
 		return np.asarray(pool_amps[diffs][:,0], dtype='int32')
