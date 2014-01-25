@@ -197,7 +197,7 @@ class CorpusDB:
 									efxSynthdefs=efx_synth, 
 									params=efx_params)
 
-		cmd = 'scsynth -N ' + oscpath + ' _ _ 44100 WAVE float32 -o 1'
+		cmd = 'scsynth -N ' + oscpath + ' _ /Users/kfl/Music/CorpusDB/rawsfids/' + str(sfid) + '.wav 44100 WAVE float32 -o 1'
 		args = shlex.split(cmd)
 		sppo = subprocess.Popen(args, stdout=None, stderr=None, shell=False, close_fds=True, preexec_fn=resource.setrlimit(resource.RLIMIT_NOFILE, (10000,10000)))
 		if verb: print "sppo:: ", sppo
