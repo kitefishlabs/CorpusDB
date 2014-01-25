@@ -92,6 +92,8 @@ class CorpusTracker:
 		# force int32 if not already so for subset_ids
 		# ids are relative to all amps:
 		subset_amps = self.amps[np.asarray(subset_ids, dtype='int32')]
+		print "DB lower bound: ", db_lower_bound
+		print "subset_amps: ", subset_amps
 		# ids are relative to subset:
 		subset_ids = np.reshape(np.argwhere(subset_amps[:,1]>db_lower_bound), (-1,1))
 		return subset_ids # np.asarray(subset_amps[subset_ids][:,0], dtype='int32')
@@ -99,7 +101,9 @@ class CorpusTracker:
 	# higher-level access functions?	
 	# track storage?
 	
-	# 3. Ranking and reranking functions
+	"""
+	3. Ranking and reranking functions
+	"""
 	def rank_units_by_euc_dist(self, target_mfccs, pool_mfccs, depth=1000, varflag=False):
 		id_ranking = np.array([], dtype='int32')
 		print "shape: ", target_mfccs.shape[0] # [:,0]
@@ -120,44 +124,60 @@ class CorpusTracker:
 			print "pool_mfccs[similarities]: ", pool_mfccs[similarities].shape
 			print "\n\nid ranking shape:", id_ranking, "\n\n"
 		return np.reshape(id_ranking, (-1, min(depth, id_ranking.shape[0])))
-
-	def rerank_units_by_concat_cost(self, t_minus_one_mfccs, pool_mfccs):
-# 		print t_minus_one_mfccs.shape
-# 		print pool_mfccs.shape
+		 
+	
+	"""
+	t_minus_one_mfccs	-	full mfcc row for the target unit
+	pool_mfccs			-	numpy array of mfccs representing
+	"""
+	def rerank_units_by_concat_cost(self, t_minus_one_mfccs, pool_mfccs, limit=-1):
 		costs = np.reshape(distance.euc2(np.atleast_2d(t_minus_one_mfccs[:,3:16]), pool_mfccs[:,3:16]), (-1,1))
 		costs = np.argsort(costs, axis=None)
-		return np.asarray(pool_mfccs[costs][:,0], dtype='int32')
+		return np.asarray(pool_mfccs[costs][:limit,0], dtype='int32')
 	
-
-	def rerank_units_by_amp(self, target_amp, pool_amps):
-		diffs = np.reshape(distance.euc2(np.atleast_2d(target_amp)[:,3:16], np.atleast_2d(pool_amps[:,1]).T), (-1,1))
-		diffs = np.argsort(diffs, axis=None)
-		diffs = np.asarray(diffs, dtype='int32')
-		return np.asarray(pool_amps[diffs][:,0], dtype='int32')
-	
-	def rerank_units_by_amp_continuity(self, target_amp_t_minus_1, pool_amps, target_amp_t_plus_1):
-		avg_amp = (target_amp_t_minus_1 + target_amp_t_plus_1) / 2.0
-		return self.rerank_units_by_amp(avg_amp, pool_amps)
-
 	"""
-	targets		-	
-	ranked_ids	-	
+	target_id 	-	(int) corpus id of target unit
+	pool_ids	-	(numpy array) ids pool units to be (re)ranked; usually whatever is returned from rank_units
+	limit		-	(int) optional max number of units to return
+	"""
+	def rerank_units_by_amp(self, target_id, pool_ids, limit=None):
+		
+		target_amps = self.amps_for_ids(np.array([target_id], dtype=np.int32))[:,1]
+		
+		diffs = np.reshape(distance.euc2(np.atleast_2d(target_amps), np.atleast_2d(self.amps_for_ids(pool_ids)[:,1]).T), (-1,1))
+		diffs = np.argsort(diffs, axis=None)
+		return np.asarray(pool_ids[diffs][:limit], dtype='int32'), diffs
+	
+	"""
+	target_id_t_minus_1 	-	(int) corpus id of target unit at time point t - 1 in a sequence of target units
+	target_id_t_plus_1		-	(int) corpus id of target unit at time point t + 1 in a sequence of target units
+	pool_ids				-	(numpy array) ids pool units to be (re)ranked; usually whatever is returned from rank_units
+	limit					-	(int) optional max number of units to return
+	"""
+	def rerank_units_by_amp_continuity(self, target_id_t_minus_1, target_id_t_plus_1, pool_ids, limit=None):
+		
+		target_amp_t_minus_1 = self.amps_for_ids(np.array([target_id_t_minus_1], dtype=np.int32))[:,1][0]
+		target_amp_t_plus_1 = self.amps_for_ids(np.array([target_id_t_plus_1], dtype=np.int32))[:,1][0]
+		avg_amp = (target_amp_t_minus_1 + target_amp_t_plus_1) / 2.0
+		return self.rerank_units_by_amp(avg_amp, pool_ids)[:limit]
+	
+	"""
+	targets		-	list of target indices
+	ranked_ids	-	ranked list of candidate unit indices
 	limit		-	max number of units to return
 	"""
-	def filter_units_by_amp_threshold_old(self, targets, ranked_ids, limit=25, db_threshold=-3):
+	def filter_units_by_amp_threshold_old(self, target_ids, ranked_ids, db_threshold=-3, limit=25):
 # 		self.uni_wrg = UniformWRG(hi=limit)
 		ranked_with_amps_gt = []
-		for i in range(targets.shape[0]):
-			print "> ", targets[i]
-			ranked_with_amps_gt += np.reshape(ranked_ids[0][self.amps_greater_than(ranked_ids[i,:], targets[i], fudge=db_threshold)], (1,-1))[:,:limit].tolist()
-		return ranked_with_amps_gt
-
-	def filter_units_by_amp_threshold_old(self, targets, ranked_ids, limit=25, db_threshold=-3):
-# 		self.uni_wrg = UniformWRG(hi=limit)
-		ranked_with_amps_gt = []
-		for i in range(targets.shape[0]):
-			print "> ", targets[i]
-			ranked_with_amps_gt += np.reshape(ranked_ids[0][self.amps_greater_than(ranked_ids[i,:], targets[i], fudge=db_threshold)], (1,-1))[:,:limit].tolist()
+		try:
+			target_ids.shape
+		except AttributeError:
+			target_ids = np.array([target_ids], dtype=np.int32)
+		
+		for i in range(target_ids.shape[0]):
+			print "> ", target_ids[i]
+			ranked_with_amps_gt += np.reshape(ranked_ids[i][self.amps_greater_than(ranked_ids[i], target_ids[i], fudge=db_threshold)], (1,-1))[:,:limit].tolist()
+		
 		return ranked_with_amps_gt
 		
 	def select_rg(self, type='urg', size=100):
@@ -170,6 +190,7 @@ class CorpusTracker:
 	
 	def rand_slot_for_depth(self, depth): 
 		return self.rg.next(depth)
+
 	
 	def iterate_random_substitutions(self, targetlist, filteredlists, num_iters=100):
 		tsize = len(targetlist)
