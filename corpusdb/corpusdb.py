@@ -163,32 +163,40 @@ class CorpusDB:
 			return None
 		return sfid
 	
-	def analyze_sound_file(self, filename, sfid, tratio=1.0, subdir=None, verb=False):
+	def analyze_sound_file(self, filename, sfid, tratio=1.0, subdir='', verb=False):
 		"""
 		Read NRT OSC score file, perform analysis asynchronously via shell, wait, signal completion and clean up.
 		"""
 		if verb: print 'file name: ', filename
 		self.parser.anchor = self.anchor
 
-		if subdir:
-			fullpath = os.path.join(self.anchor, 'snd', subdir, filename)
-		else:
-			fullpath = os.path.join(self.anchor, 'snd', filename)
+# 		if subdir:
+# 			fullpath = os.path.join(self.anchor, 'snd', subdir, filename)
+# 		else:
+# 			fullpath = os.path.join(self.anchor, 'snd', filename)
 
-		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(filename)[0] + '_' + `tratio` + '_power_mfcc24Analyzer.osc'))
-		if verb: print 'create nrt score args: ', fullpath, ' ', oscpath
+# 		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(filename)[0] + '_' + `tratio` + '_power_mfcc24Analyzer.osc'))
 		#print sfid, ' '	, tratio, ' ', self.rate, ' ', self.sftree.nodes[sfid].duration, ' ', oscpath
-		
+		if subdir is None:
+			subdir = ''
 		try:
 			synthid = self.sftree.nodes[sfid].parent_id
 # 			print "=== ", synthid
 			efx_synth = self.sftree.sfmap[sfid][0]
 			efx_params = self.sftree.sfmap[sfid][1]
+			fullpath = os.path.join(self.anchor, 'snd', subdir, self.sftree.nodes[synthid].sfpath)
 		except AttributeError:
 			synthid = sfid
 			efx_synth = None
 			efx_params = None
+			fullpath = os.path.join(self.anchor, 'snd', subdir, self.sftree.nodes[sfid].sfpath)
+		print 'fullpath: ', fullpath
+		
 		# print "### ", synthid, '\n', self.sftree.sfmap[sfid][0], '\n', self.sftree.sfmap[sfid][1]
+		
+		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(os.path.basename(fullpath))[0] + '_' + `tratio` + '_power_mfcc24Analyzer.osc'))
+		if verb: print 'create nrt score args: ', fullpath, ' ', oscpath
+		
 		self.parser.createNRTAnalysisScore(fullpath, 
 									tratio=tratio, 
 									duration=self.sftree.nodes[sfid].duration, 
@@ -289,8 +297,6 @@ class CorpusDB:
 	
 	def segment_units(self, sfid, verb=False):
 		"""
-		With all due respect to Mr. Levi-Strauss...
-		
 		This function takes the list of unit breakpoints, plus the raw metadata, and assembles 'cooked' segments in the corpus segtable.
 		
 		Note: currently ignores the amplitude scalars...
@@ -298,7 +304,7 @@ class CorpusDB:
 		"""
 		segmented = self.get_sorted_units_list(sfid)
 		raw_amps, raw_mfccs = self._activate_raw_metadata(sfid)
-		amps , reheated = [], []
+		amps, reheated = [], []
 		
 		if verb: print 'raw: ', raw_amps
 		amps_stripped = np.nan_to_num(raw_amps)
@@ -315,9 +321,12 @@ class CorpusDB:
 			#reheated += [np.mean(mfccs_stripped[offset:(offset+dur)], axis=0, dtype=np.float32)]
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, mfccs=np.mean(mfccs_stripped[offset:(offset+dur)], axis=0, dtype=np.float32))
 		
-	# [MEAN, MAX, LVAL, RVAL, SLOPE]
-	# offset and dur are in frames
+
 	def analyze_scalar(self, raw_stripped, offset, dur, verb=False):
+		"""
+		[MEAN, MAX, LVAL, RVAL, SLOPE]
+		offset and dur are in frames
+		"""
  		if verb: print "offset: ", offset
  		if verb: print "dur: ", dur
  		if verb: print raw_stripped.shape
@@ -332,17 +341,16 @@ class CorpusDB:
  		if verb: print [mn, max, l_val, r_val]
 		return [(math.log10(x) * 20.0) if x > 0.000001 else -120 for x in [mn, max, l_val, r_val]] + [slope]
 
-	# test me
 	def add_corpus_unit(self, uid, metadata, verb=False):
 		"""
-	
+		test me
 		"""
 		# some basic metadata checks? check for key collisions?
 		self.cutable[uid] = metadata
 
-	# test me
 	def remove_corpus_unit(self, cid, verb=False):
 		"""
+		test me
 		Remove a units from the corpus units table.	
 		"""
 		try:
@@ -350,22 +358,22 @@ class CorpusDB:
 		except KeyError:
 			print 'Error: attempting to remove corpus unit that does not exist at index ', cid, '.'
 	
-	# test me
 	def clear_corpus_units(self, verb=False):
 		"""
+		test me
 		Remove all units from the corpus units table.
 		"""
 		for k, unit in enumerate(self.cutable):
 			self.cutable[k] = None
 	
-	# test me
 	def get_sound_file_unit_metadata(self, sfid, verb=False):
 		"""
+		test me
 		Get the metadata rows for all units associated with a sound file.
 		"""
 		return sorted([entry for entry in self.cutable if entry[2] == sfid], key = lambda row: row[0])
 	
-	def map_sound_file_units_to_corpus_units(self, verb=False):
+	def map_sound_file_units_to_corpus_units(self, verb=True):
 		"""
 		Build the corpus unit table from entries found in the sound file unit table.
 		"""
@@ -389,6 +397,7 @@ class CorpusDB:
 				for k in self.sftree.nodes[node].unit_amps.keys():
 					amp_segment = self.sftree.nodes[node].unit_amps[k]
 					mfccs_segment = self.sftree.nodes[node].unit_mfccs[k]
+					# mfccs_vars_segment = self.sftree.nodes[node].unit_mfccs_vars[k]
 					index = self.cu_offset
 					
 					if verb: print '@ relid: ', sf_unit_segments[relid].onset
@@ -396,7 +405,9 @@ class CorpusDB:
 					if verb: print 'row: ', row.shape
 					if verb: print 'amp segment: ', amp_segment
 					if verb: print 'mfccs segment: ', mfccs_segment
+					# if verb: print 'mfccs vars segment: ', mfccs_vars_segment
 					self.add_corpus_unit(index, np.concatenate([row, amp_segment, mfccs_segment]))
+					# self.add_corpus_unit(index, np.concatenate([row, amp_segment, mfccs_segment, mfccs_vars_segment]))
 					relid += 1
 					self.cu_offset += 1
 			except KeyError:
@@ -424,8 +435,8 @@ class CorpusDB:
 	# CORPUS RAW ARRAY ACCESS
 	#
 	
-	#	 index (9)           amp (5)         mfccs (24)	
-	#	[0 1 2 3 4 5 6 7 8] [9 10 11 12 13] [14 15 16 17 ... 37]
+	#	 index (9)           amp (5)         mfccs (24)           mfccs_vars (24)
+	#	[0 1 2 3 4 5 6 7 8] [9 10 11 12 13] [14 15 16 17 ... 37] [38 39 40 41 ... 61]
 	#
 	
 	def convert_corpus_to_array(self, type='all', map_flag=False, verb=False):
@@ -441,9 +452,10 @@ class CorpusDB:
 		X = np.array(xlist, dtype='float32')
 		X = np.reshape(X, (-1, num_descriptors))
 		
-		if type is 'I':		return np.c_[X[:,0], X[:,:9]]
+		if type is 'I':		return np.c_[X[:,0], X[:,1:9]]
 		elif type is 'A': 	return np.c_[X[:,0], X[:,9:14]]
-		elif type is 'M':	return np.c_[X[:,0], X[:,14:]]
+		elif type is 'M':	return np.c_[X[:,0], X[:,14:38]]
+		elif type is 'MV':	return np.c_[X[:,0], X[:,38:]]
 		elif type is 'all':	return np.c_[X[:,0], X]
 		else:				raise ArgumentError
 	
