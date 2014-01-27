@@ -400,7 +400,7 @@ class CorpusDB:
 					# mfccs_vars_segment = self.sftree.nodes[node].unit_mfccs_vars[k]
 					index = self.cu_offset
 					
-					if verb: print '@ relid: ', sf_unit_segments[relid].onset
+					if verb: print '@ relid/onset: ', relid, '| ', sf_unit_segments[relid].onset
 					row = np.array([index, parent_id, sf_id, relid, sf_proc_id, sf_unit_segments[relid].tag, sf_unit_segments[relid].onset, sf_unit_segments[relid].dur, sf_tratio])
 					if verb: print 'row: ', row.shape
 					if verb: print 'amp segment: ', amp_segment
