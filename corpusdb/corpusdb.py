@@ -105,11 +105,11 @@ class CorpusDB:
 			return child_node
 		
 
-	def remove_sound_file(self, path, verb=False):
+	def remove_sound_file(self, sfid, verb=False):
 		"""
 	
 		"""
-		return NotImplementedError
+		del self.sftree.nodes[sfid]
 	
 	def importSoundFileToBuffer(self, path, sfid, verb=False):
 		"""
@@ -364,8 +364,9 @@ class CorpusDB:
 		Remove all units from the corpus units table.
 		"""
 		self.cu_offset = 0
-		for k, unit in enumerate(self.cutable):
-			self.cutable[k] = None
+		# for k, unit in enumerate(self.cutable):
+		#	self.cutable[k] = None
+		self.cutable = dict()
 	
 	def get_sound_file_unit_metadata(self, sfid, verb=False):
 		"""
