@@ -29,6 +29,7 @@ class NRTOSCParser:
 	"""
 	def __init__(self, crps):
 		self.corpus = crps
+		self._analysis_synth = 'bus_analyzer_amp_mfcc24_mn_nrt'
 	
 	def absToOSCTimestamp(self, abs):
 		return struct.pack('!LL', math.floor(abs), long(float(abs - long(abs)) * 4294967296L))
@@ -133,7 +134,7 @@ class NRTOSCParser:
 		oscList += [[0.01, ["/b_alloc", aBuf, int(math.ceil((duration/0.04) / tratio)), 25]]]
 		
 		# minimal list of 2 Synthdefs, playback --> analysis
-		sdefs = [synthdef, 'power_mfcc24BusAnalyzerNRT']
+		sdefs = [synthdef, self._analysis_synth]
 		# insert effect/processing Synthdefs...
 		if efxSynthdefs is not None:
 			for sdef in efxSynthdefs:

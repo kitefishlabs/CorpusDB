@@ -175,7 +175,7 @@ class CorpusDB:
 # 		else:
 # 			fullpath = os.path.join(self.anchor, 'snd', filename)
 
-# 		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(filename)[0] + '_' + `tratio` + '_power_mfcc24Analyzer.osc'))
+# 		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(filename)[0] + '_' + `tratio` + '_bus_analyzer_amp_mfcc24_mn_nrt.osc'))
 		#print sfid, ' '	, tratio, ' ', self.rate, ' ', self.sftree.nodes[sfid].duration, ' ', oscpath
 		if subdir is None:
 			subdir = ''
@@ -194,7 +194,7 @@ class CorpusDB:
 		
 		# print "### ", synthid, '\n', self.sftree.sfmap[sfid][0], '\n', self.sftree.sfmap[sfid][1]
 		
-		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(os.path.basename(fullpath))[0] + '_' + `tratio` + '_power_mfcc24Analyzer.osc'))
+		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(os.path.basename(fullpath))[0] + '_' + `tratio` + 'bus_analyzer_amp_mfcc24_mn_nrt.osc'))
 		if verb: print 'create nrt score args: ', fullpath, ' ', oscpath
 		
 		self.parser.createNRTAnalysisScore(fullpath, 
@@ -363,6 +363,7 @@ class CorpusDB:
 		test me
 		Remove all units from the corpus units table.
 		"""
+		self.cu_offset = 0
 		for k, unit in enumerate(self.cutable):
 			self.cutable[k] = None
 	
@@ -373,7 +374,7 @@ class CorpusDB:
 		"""
 		return sorted([entry for entry in self.cutable if entry[2] == sfid], key = lambda row: row[0])
 	
-	def map_sound_file_units_to_corpus_units(self, verb=True):
+	def map_sound_file_units_to_corpus_units(self, verb=False):
 		"""
 		Build the corpus unit table from entries found in the sound file unit table.
 		"""
@@ -392,13 +393,13 @@ class CorpusDB:
 			sf_unit_segments = self.sftree.nodes[node].unit_segments
 			relid = 0
 			
-			
 			try:
 				for k in self.sftree.nodes[node].unit_amps.keys():
 					amp_segment = self.sftree.nodes[node].unit_amps[k]
 					mfccs_segment = self.sftree.nodes[node].unit_mfccs[k]
 					# mfccs_vars_segment = self.sftree.nodes[node].unit_mfccs_vars[k]
 					index = self.cu_offset
+					
 					
 					if verb: print '@ relid/onset: ', relid, '| ', sf_unit_segments[relid].onset
 					row = np.array([index, parent_id, sf_id, relid, sf_proc_id, sf_unit_segments[relid].tag, sf_unit_segments[relid].onset, sf_unit_segments[relid].dur, sf_tratio])
