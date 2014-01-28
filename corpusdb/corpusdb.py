@@ -74,8 +74,16 @@ class CorpusDB:
 		# information about the corpus's current state
 		self.sf_offset = 0
 		self.cu_offset = 0
-		self.dtable = dict({0: 'unitID', 1: 'parentID', 2: 'sfileID', 3: 'sfRelID', 4: 'procID', 5: 'tag',
-			6: 'onset', 7: 'duration', 8: 'tRatio'})
+		self.dtable = dict({
+			0: 'unitID',
+			1: 'parentID', 
+			2: 'sfileID', 
+			3: 'sfRelID', 
+			4: 'procID', 
+			5: 'tag',
+			6: 'onset', 
+			7: 'duration', 
+			8: 'tRatio'})
 		
 	def add_sound_file(self, filename=None, sfid=None, srcFileID=None, tratio=1.0, synthdef=None, params=None, procid=None, subdir=None, reuseFlag=None, importFlag=None, uflag=None, verb=False):
 		"""
@@ -471,7 +479,7 @@ class CorpusDB:
 		
 		print info.shape
 		
-		indices = np.argwhere(info[:,6]==tag)
+		indices = np.argwhere(info[:,5]==tag)
 # 		indices = np.reshape(indices, (indices.shape[0],))
 
 		# use the tagged indices to pull out the tagged entries
