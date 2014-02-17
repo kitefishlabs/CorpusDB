@@ -28,6 +28,7 @@ TO DO:
 * extend SFTree/nodes model
 * implement synthesis nodes
 * simplify workflows
+* more wrapping of functionality into classes
 
 """
 
@@ -47,22 +48,20 @@ class CorpusDB:
 	"""
 		
 	"""
-	def __init__(self, name, sudo_flag='False', verb=False):
+	def __init__(self, name, rate=44100, sudo_flag='False', verb=False):
 		self.anchor = name
-		self.rate = 44100
+		self.rate = rate
 		self.HOP_SECS = 0.04
 		self.HOP_MS = self.HOP_SECS * 1000
 		
 		self.reset_corpus()
-				
 		self.parser = nrtoscparser.NRTOSCParser(self)
-			
 		self.sound_file_units_mapped = False
 		
 		#if sudo_flag is True: resource.setrlimit(resource.RLIMIT_NOFILE, (16384, 16384)) #!!!
 		os.chdir(self.anchor) # just in case we created this corpus using a link...
 	
-	def reset_corpus(self, verb=False):
+	def reset_corpus(self, alist=[9,5,13,13,12], verb=False):
 		
 		self.sftree = sftree.SFTree(self, self.anchor)
 		self.cutable = dict()
@@ -71,20 +70,24 @@ class CorpusDB:
 		self.rawmaps = dict()
 		self.powers = dict()
 		self.mfccs = dict()
+		self.chromas = dict() ####$
 		# information about the corpus's current state
 		self.sf_offset = 0
 		self.cu_offset = 0
-		self.dtable = dict({
-			0: 'unitID',
-			1: 'parentID', 
-			2: 'sfileID', 
-			3: 'sfRelID', 
-			4: 'procID', 
-			5: 'tag',
-			6: 'onset', 
-			7: 'duration', 
-			8: 'tRatio'})
-		
+		self.alist = alist
+		if self.alist[0] == 9:
+			self.dtable = dict({
+				0: 'unitID',
+				1: 'parentID', 
+				2: 'sfileID', 
+				3: 'sfRelID', 
+				4: 'procID', 
+				5: 'tag',
+				6: 'onset', 
+				7: 'duration', 
+				8: 'tRatio'})
+		self.num_descrids = sum(alist)
+	
 	def add_sound_file(self, filename=None, sfid=None, srcFileID=None, tratio=1.0, synthdef=None, params=None, procid=None, subdir=None, reuseFlag=None, importFlag=None, uflag=None, verb=False):
 		"""
 		Add a sound file to the corpus. Either a filename or an sfid must be provided.
@@ -111,8 +114,7 @@ class CorpusDB:
 			child_node = self.sftree.add_child_node(srcFileID, sfid, tratio, synthdef, params, procid=procid, uniqueFlag=uflag)
 			if verb: print "add_child_node res: ", child_node.parent_id, ', ', child_node.sfid, ', ', child_node.tratio
 			return child_node
-		
-
+	
 	def remove_sound_file(self, sfid, verb=False):
 		"""
 	
@@ -145,16 +147,16 @@ class CorpusDB:
 		num_frames = pair[1]
 		try:
 			if verb: print "RAW MAPS SHAPE: ", self.rawmaps[sfid].shape
-			power_vector = self.rawmaps[sfid].T[0]
-			mfccs_vector = self.rawmaps[sfid].T[1:].T
+			power_vector = self.rawmaps[sfid].T[0]  						####$
+			mfccs_vector = self.rawmaps[sfid].T[1:].T 						####$
 		except KeyError:
 			#print "key errors are good..."
 			self.rawmaps[sfid] = np.memmap(mdpath, dtype=np.float32, mode='r', offset=272, shape=(num_frames, 25))
 			if verb: print "RAW MAPS SHAPE: ", self.rawmaps[sfid].shape
-			power_vector = self.rawmaps[sfid].T[0]
-			mfccs_vector = self.rawmaps[sfid].T[1:].T
-		self.powers[sfid] = power_vector
-		self.mfccs[sfid] = mfccs_vector
+			power_vector = self.rawmaps[sfid].T[0]							 ####$
+			mfccs_vector = self.rawmaps[sfid].T[1:].T						 ####$
+		self.powers[sfid] = power_vector									 ####$
+		self.mfccs[sfid] = mfccs_vector										 ####$
 				
 		return self.powers[sfid], self.mfccs[sfid]
     
@@ -163,33 +165,30 @@ class CorpusDB:
 		Free all raw metadata associated with the given sf id.
 		"""
 		try:
-			del self.rawmaps[sfid]
-			del self.powers[sfid]
-			del self.mfccs[sfid]
+			del self.rawmaps[sfid]											 ####$
+			del self.powers[sfid]											 ####$
+			del self.mfccs[sfid]											 ####$
 		except KeyError:
 			print "Attempt to deactivate memmap or other metadata for key ", sfid, " has failed."
 			return None
 		return sfid
 	
-	def analyze_sound_file(self, filename, sfid, tratio=1.0, subdir='', verb=False):
+	def analyze_sound_file(self, filename, sfid, tratio=1.0, subdir='', outwav=False, verb=False):
 		"""
-		Read NRT OSC score file, perform analysis asynchronously via shell, wait, signal completion and clean up.
+			Read NRT OSC score file, perform analysis asynchronously via shell, wait, signal completion and clean up.
+		
+			This function intelligently synthesizes the synthid, efx_synths, efxparams, and fullpath based on the input.
+			
+			Subdir arg is an empty string ('') if not used.
 		"""
 		if verb: print 'file name: ', filename
 		self.parser.anchor = self.anchor
 
-# 		if subdir:
-# 			fullpath = os.path.join(self.anchor, 'snd', subdir, filename)
-# 		else:
-# 			fullpath = os.path.join(self.anchor, 'snd', filename)
-
-# 		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(filename)[0] + '_' + `tratio` + '_bus_analyzer_amp_mfcc24_mn_nrt.osc'))
 		#print sfid, ' '	, tratio, ' ', self.rate, ' ', self.sftree.nodes[sfid].duration, ' ', oscpath
 		if subdir is None:
 			subdir = ''
 		try:
 			synthid = self.sftree.nodes[sfid].parent_id
-# 			print "=== ", synthid
 			efx_synth = self.sftree.sfmap[sfid][0]
 			efx_params = self.sftree.sfmap[sfid][1]
 			fullpath = os.path.join(self.anchor, 'snd', subdir, self.sftree.nodes[synthid].sfpath)
@@ -198,11 +197,10 @@ class CorpusDB:
 			efx_synth = None
 			efx_params = None
 			fullpath = os.path.join(self.anchor, 'snd', subdir, self.sftree.nodes[sfid].sfpath)
-		print 'fullpath: ', fullpath
+
+		if verb: print 'fullpath: ', fullpath, '\n synthid: ', synthid, '\n', self.sftree.sfmap[sfid][0], '\n', self.sftree.sfmap[sfid][1]
 		
-		# print "### ", synthid, '\n', self.sftree.sfmap[sfid][0], '\n', self.sftree.sfmap[sfid][1]
-		
-		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(os.path.basename(fullpath))[0] + '_' + `tratio` + 'bus_analyzer_amp_mfcc24_mn_nrt.osc'))
+		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(os.path.basename(fullpath))[0] + '_' + `tratio` + '_' + 'bus_analyzer_power_mfcc24_mn_nrt' + '.osc')) ####$
 		if verb: print 'create nrt score args: ', fullpath, ' ', oscpath
 		
 		self.parser.createNRTAnalysisScore(fullpath, 
@@ -213,12 +211,19 @@ class CorpusDB:
 									efxSynthdefs=efx_synth, 
 									params=efx_params)
 
-		cmd = 'scsynth -N ' + oscpath + ' _ /Users/kfl/Music/CorpusDB/rawsfids/' + str(sfid) + '.aif 44100 AIFF int16 -o 1'
+		if outwav:
+			wavfile = ('/Users/kfl/Music/CorpusDB/rawsfids/' + str(sfid) + '.wav')
+		else:
+			wavfile = ''
+		
+		cmd = 'scsynth -N ' + oscpath + ' _ ' + wavfile + ' 44100 WAV int16 -o 1'
+		if verb: print cmd
+		
 		args = shlex.split(cmd)
 		sppo = subprocess.Popen(args, stdout=None, stderr=None, shell=False, close_fds=True, preexec_fn=resource.setrlimit(resource.RLIMIT_NOFILE, (10000,10000)))
 		if verb: print "sppo:: ", sppo
+		
 		rc = sppo.wait()
-
 		if verb: print 'RC: ', rc
 		if rc == 1:
 			cwd = os.path.abspath(fullpath)
@@ -281,7 +286,6 @@ class CorpusDB:
 		"""		
 		try:
 			self.sftree.nodes[sfid].unit_segments = []
-			#self.segtable[sfid]['umd'] = []
 		except KeyError:
 			'Error: there is no entry for ', sfid, ' in the sf map. Update SFU failed.'
 			return None
@@ -294,6 +298,7 @@ class CorpusDB:
 		"""
 		try:
 			return self.powers[sfid], self.mfccs[sfid] #, self.activation_layers[sfid], self.cooked_layers[sfid]
+			####$ ***
 		except KeyError:
 			return self._activate_raw_metadata(sfid) # now self.rawmaps[sfid] should exist or res == None if not
 	
@@ -303,11 +308,13 @@ class CorpusDB:
 		"""
 		return self.sftree.nodes[sfid].sort_segments_list()
 	
+	####$
+	####$ -- redo whole function!
 	def segment_units(self, sfid, verb=False):
 		"""
 		This function takes the list of unit breakpoints, plus the raw metadata, and assembles 'cooked' segments in the corpus segtable.
 		
-		Note: currently ignores the amplitude scalars...
+		Note: currently ignores the amplitude scalars (aside from generating stats)...
 		
 		"""
 		segmented = self.get_sorted_units_list(sfid)
@@ -347,6 +354,7 @@ class CorpusDB:
 		r_val = np.mean(chopped[-2:])
 		slope = (r_val - l_val) / float(dur)
  		if verb: print [mn, max, l_val, r_val]
+ 		####$ WHY * 20.0 ???
 		return [(math.log10(x) * 20.0) if x > 0.000001 else -120 for x in [mn, max, l_val, r_val]] + [slope]
 
 	def add_corpus_unit(self, uid, metadata, verb=False):
@@ -404,19 +412,19 @@ class CorpusDB:
 			
 			try:
 				for k in self.sftree.nodes[node].unit_amps.keys():
-					amp_segment = self.sftree.nodes[node].unit_amps[k]
-					mfccs_segment = self.sftree.nodes[node].unit_mfccs[k]
-					# mfccs_vars_segment = self.sftree.nodes[node].unit_mfccs_vars[k]
+					amp_segment = self.sftree.nodes[node].unit_amps[k]						####$
+					mfccs_segment = self.sftree.nodes[node].unit_mfccs[k]					####$
+					# mfccs_vars_segment = self.sftree.nodes[node].unit_mfccs_vars[k]		####$
 					index = self.cu_offset
 					
 					
 					if verb: print '@ relid/onset: ', relid, '| ', sf_unit_segments[relid].onset
 					row = np.array([index, parent_id, sf_id, relid, sf_proc_id, sf_unit_segments[relid].tag, sf_unit_segments[relid].onset, sf_unit_segments[relid].dur, sf_tratio])
 					if verb: print 'row: ', row.shape
-					if verb: print 'amp segment: ', amp_segment
-					if verb: print 'mfccs segment: ', mfccs_segment
+					if verb: print 'amp segment: ', amp_segment								####$
+					if verb: print 'mfccs segment: ', mfccs_segment							####$
 					# if verb: print 'mfccs vars segment: ', mfccs_vars_segment
-					self.add_corpus_unit(index, np.concatenate([row, amp_segment, mfccs_segment]))
+					self.add_corpus_unit(index, np.concatenate([row, amp_segment, mfccs_segment]))		####$
 					# self.add_corpus_unit(index, np.concatenate([row, amp_segment, mfccs_segment, mfccs_vars_segment]))
 					relid += 1
 					self.cu_offset += 1
@@ -462,12 +470,16 @@ class CorpusDB:
 		X = np.array(xlist, dtype='float32')
 		X = np.reshape(X, (-1, num_descriptors))
 		
-		if type is 'I':		return np.c_[X[:,0], X[:,1:9]]
-		elif type is 'A': 	return np.c_[X[:,0], X[:,9:14]]
-		elif type is 'M':	return np.c_[X[:,0], X[:,14:38]]
-		elif type is 'MV':	return np.c_[X[:,0], X[:,38:]]
-		elif type is 'all':	return np.c_[X[:,0], X]
-		else:				raise ArgumentError
+		if type is 'I':			return np.c_[X[:,0], X[:,1:9]]
+		elif type is 'A5': 		return np.c_[X[:,0], X[:,9:14]]
+		elif type is 'M13':		return np.c_[X[:,0], X[:,14:27]]
+		elif type is 'M13var':	return np.c_[X[:,0], X[:,27:40]]
+		elif type is 'M24':		return np.c_[X[:,0], X[:,14:38]]
+		elif type is 'M24var':	return np.c_[X[:,0], X[:,38:62]]
+		elif type is 'C12':		return np.c_[X[:,0], X[:,-12:]] # either 40: or 62:
+		elif type is 'all':		return np.c_[X[:,0], X]
+		else:
+			raise ArgumentError
 	
 	def convert_corpus_to_tagged_array(self, type='all', tag=0.0, map_flag=False, verb=False):
 		"""
