@@ -27,9 +27,10 @@ class NRTOSCParser:
 	"""
 	anchor = corpus anchor (directory where corpus resides)
 	"""
-	def __init__(self, crps):
+	def __init__(self, crps, num_features=24):
 		self.corpus = crps
-		self._analysis_synth = 'bus_analyzer_amp_mfcc24_mn_nrt'
+		self._analysis_synth = 'bus_analyzer_power_mfcc24_mn_nrt'
+		self._analysis_features = num_features
 	
 	def absToOSCTimestamp(self, abs):
 		return struct.pack('!LL', math.floor(abs), long(float(abs - long(abs)) * 4294967296L))
@@ -131,7 +132,7 @@ class NRTOSCParser:
 	
 		## the two buffer alloc calls
 		oscList = [[0.0, ["/b_allocReadChannel", pBuf, sfpath, 0, -1, '[0]']]]
-		oscList += [[0.01, ["/b_alloc", aBuf, int(math.ceil((duration/0.04) / tratio)), 25]]]
+		oscList += [[0.01, ["/b_alloc", aBuf, int(math.ceil((duration/0.04) / tratio)), self._analysis_features]]]
 		
 		# minimal list of 2 Synthdefs, playback --> analysis
 		sdefs = [synthdef, self._analysis_synth]
