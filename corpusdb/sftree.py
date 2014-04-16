@@ -18,6 +18,7 @@ __email__ = 'tms@kitefishlabs.com'
 
 
 import os, sys, time, wave, contextlib
+import numpy as np
 
 
 class SFTree:
@@ -61,8 +62,8 @@ class SFTree:
 			dur = frames/float(rate)
 			chnls = f.getnchannels()
 		
-		if chnls == 1: synthdef = 'monoSamplerNRT'
-		else: synthdef = 'stereoSamplerNRT'
+		if chnls == 1: synthdef = 'sampler_mn_nrt'
+		else: synthdef = 'sampler_st_nrt'
 		if verb: print 'SD: ', synthdef
 		
 		try:
@@ -138,8 +139,10 @@ class Node:
 		self.sfid = sfID
 		self.hashstring = ""
 		self.unit_segments = [] # create an empty container for unit bounds and tags
-		self.unit_amps = dict()
+		self.unit_powers = dict()
 		self.unit_mfccs = dict()
+		self.unit_mfcc_vars = dict()
+		self.unit_chromas = dict()
 		self.verify_synthname_and_params()
 
 
@@ -182,10 +185,14 @@ class Node:
 		"""
 		return  [x for x in self.unit_segments] #.sort(key=lambda unit: unit[0])
 	
-	def add_metadata_for_relid(self, relid, amps=None, mfccs=None, verb=False):
-		if relid is not None and amps is not None: self.unit_amps[relid] = amps
+	def add_metadata_for_relid(self, relid, powers=None, mfccs=None, mfcc_vars=None, chromas=None, verb=False):
+		"""
+		Add one or multiple types of raw metadata to a node
+		"""
+		if relid is not None and powers is not None: self.unit_powers[relid] = np.array(powers)
 		if relid is not None and mfccs is not None: self.unit_mfccs[relid] = mfccs
-		
+		if relid is not None and mfcc_vars is not None: self.unit_mfcc_vars[relid] = mfcc_vars
+		if relid is not None and chromas is not None: self.unit_chromas[relid] = chromas
 	
 class SamplerNode(Node):
 	"""
@@ -295,7 +302,7 @@ class SynthNode(Node):
 		return "Synth Node: %s"%(self.synth)
 
 
-
+# shouldn't the __eq__ methods compare the sfid? or is that implicit?
 class SFU():
 	def __init__(self, onset=0, dur=0, tag=0, verb=False):
 		self.onset = onset
