@@ -27,9 +27,9 @@ class NRTOSCParser:
 	"""
 	anchor = corpus anchor (directory where corpus resides)
 	"""
-	def __init__(self, crps, num_features=24):
+	def __init__(self, crps, analysis_synth='bus_analyzer_power_mfcc24_mn_nrt', num_features=24):
 		self.corpus = crps
-		self._analysis_synth = 'bus_analyzer_power_mfcc24_mn_nrt'
+		self._analysis_synth = analysis_synth
 		self._analysis_features = num_features
 	
 	def absToOSCTimestamp(self, abs):
@@ -47,7 +47,7 @@ class NRTOSCParser:
 		elif type(val) == type(0.2):
 			return struct.pack('!f', val)
 
-	def processAndWriteFile(self, score, output):
+	def processAndWriteFile(self, score, output, verbose = False):
 		#print "score: ", score
 		header = bytearray("\x00\x00\x00$#bundle\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x10/g_new\x00\x00,i\x00\x00\x00\x00\x00\x01\x00\x00\x00$#bundle\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x10/g_new\x00\x00,i\x00\x00\x00\x00\x00\x01")
 		total_length = 0
@@ -101,7 +101,8 @@ class NRTOSCParser:
 						oscDir = '/Users/me/corpus/snd/score.osc',
 						synthdef = 'monoSamplerNRT',
 						efxSynthdefs = None,
-						params = None):
+						params = None,
+						verbose = False):
 		"""
 		args:
 			sfpath			-	full path to sound file that is being played/processed/analyzed
@@ -223,23 +224,22 @@ class NRTOSCParser:
 				# 					'synthdefs' : [parentnode.synth, childnode.synth],
 				# 					'params' : [None, childnode.params],
 				# 					'tratio' : self.corpus.sftree.nodes[sfid].tratio)
-		print sfInfo
-		print oscList
+		if verbose:
+			print sfInfo
+			print oscList
 		runningdur = 0
 		for segment in triosList:
 			sfid = segment[0]
-			#print 'sfid: ', type(sfid)
 			offset = segment[1]
 			dur = segment[2]
-			#print type(offset)
-			#print type(dur)
-			print "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
-			print sfInfo[sfid]['synthdef'][0]
-			print int(sfid)
-			print float(offset)
-			print float(dur)
-			print sfInfo[sfid]['tratio']
-			print "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+			if verbose:
+				print "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+				print sfInfo[sfid]['synthdef'][0]
+				print int(sfid)
+				print float(offset)
+				print float(dur)
+				print sfInfo[sfid]['tratio']
+				print "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
 			oscList += [[(0.01+runningdur), ["/s_new", 
 				sfInfo[sfid]['synthdef'][0], 
 				-1, 
@@ -259,8 +259,9 @@ class NRTOSCParser:
 		
 		oscList += [[(runningdur + 0.02), ["/c_set", 0, 0]]]
 
-		print "======================"
-		print oscList
+		if verbose:
+			print "======================"
+			print oscList
 				
 		# pass the osc list to function that writes binary .osc file
 		self.processAndWriteFile(oscList, oscDir)
