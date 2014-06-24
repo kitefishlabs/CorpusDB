@@ -1,3 +1,19 @@
+"""
+Part of corpusdb, corpus-based processing for SuperCollider + Python.
+
+Overview
+========
+
+etc.
+
+"""
+
+__version__ = '1.0'
+__author__ = 'Thomas Stoll'
+__copyright__ = "Copyright (C) 2014, Thomas Stoll, All Rights Reserved"
+__license__ = "gpl 3.0 or higher"
+__email__ = 'tms@kitefishlabs.com'
+
 import numpy as np
 from bregman.suite import *
 import random, math

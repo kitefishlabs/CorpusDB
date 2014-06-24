@@ -12,7 +12,7 @@ etc.
 
 __version__ = '1.0'
 __author__ = 'Thomas Stoll'
-__copyright__ = "Copyright (C) 2012-13, Thomas Stoll, All Rights Reserved"
+__copyright__ = "Copyright (C) 2012-14, Thomas Stoll, All Rights Reserved"
 __license__ = "gpl 3.0 or higher"
 __email__ = 'tms@kitefishlabs.com'
 
