@@ -142,19 +142,19 @@ class CorpusDB:
 			rawmaps = self.rawmaps[sfid].T
 			if verb: print "RAW MAPS SHAPE: ", rawmaps.shape
 			power_vector 		= rawmaps[0]
-			mfccs_vector 		= rawmaps[1     : 1+13].T
-			chroma_vector 		= rawmaps[1+13	: 1+13+12].T
+			mfccs_vector 		= rawmaps[self.alist.powers.rawwidth     	: self.alist.powers.rawwidth+self.alist.rawwidth].T
+			# chroma_vector 		= rawmaps[self.alist.powers.rawwidth+13	: self.alist.powers.rawwidth+self.alist.rawwidth+12].T
 		except KeyError:
 			#print "key errors are good..."
 			self.rawmaps[sfid] = rawmaps = np.memmap(mdpath, dtype=np.float32, mode='r', offset=280, shape=(num_frames, self.num_raw_features))
 			if verb: print "RAW MAPS SHAPE: ", self.rawmaps[sfid].shape
 			power_vector 		= rawmaps.T[0]
-			mfccs_vector 		= rawmaps.T[1       : 1+13].T
-			chroma_vector 		= rawmaps.T[1+13	: 1+13+12].T
+			mfccs_vector 		= rawmaps.T[self.alist.powers.rawwidth      : self.alist.powers.rawwidth+self.alist.rawwidth].T
+			# chroma_vector 		= rawmaps.T[1+13	: 1+13+12].T
 		
 		self.powers[sfid]		=	power_vector
 		self.mfccs[sfid]		=	mfccs_vector
-		self.chromas[sfid]		=	chroma_vector
+		# self.chromas[sfid]		=	chroma_vector
 				
 		return self.powers[sfid], self.mfccs[sfid], self.chromas[sfid]
     
