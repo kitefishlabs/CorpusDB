@@ -75,10 +75,9 @@ class CorpusDB:
 		# information about the corpus's current state
 		self.sf_offset = 0
 		self.cu_offset = 0
-		self.alist = MFCC_Chromas(var_flag=True)
+		self.alist = MFCCs(var_flag=True)
 		# double-check size
-		if self.alist.powers.indexes.numfeatures == 9:
-			self.dtable = self.alist.powers.indexes
+		# self.alist.powers.indexes == dtable
 		self.num_raw_features = self.alist.powers.rawwidth + self.alist.rawwidth
 		self.num_cooked_features = self.alist.powers.width + self.alist.width # after variance, stats, etc. are calculated
 	
@@ -217,7 +216,7 @@ class CorpusDB:
 		else:
 			wavfile = ' _ '
 		
-		cmd = 'scsynth -N ' + oscpath + ' ' + fullpath + wavfile + ' 44100 WAV int16 -o 1'
+		cmd = 'scsynth -N ' + oscpath + ' ' + fullpath + wavfile + ' 44100 WAVE int16 -o 1'
 		if verb: print cmd
 		
 		args = shlex.split(cmd)
@@ -626,7 +625,7 @@ class CorpusDB:
 		if verb: print ''
 		if verb: print self.sftree.procmap
 		if verb: print ''
-		toplevel = { 'descriptors': self.dtable, 'anchorpath': self.anchor, 'procmap': self.sftree.procmap }
+		toplevel = { 'descriptors': self.alist.powers.indexes, 'anchorpath': self.anchor, 'procmap': self.sftree.procmap }
 		sf = dict()
 		for sfid in self.sftree.nodes.keys():
 			sf[sfid] = self.sftree.nodes[sfid].render_json()

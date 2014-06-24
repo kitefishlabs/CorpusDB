@@ -1,5 +1,3 @@
-#
-
 """
 Part of corpusdb, corpus-based processing for SuperCollider + Python.
 
@@ -30,7 +28,7 @@ class NRTOSCParser:
 	def __init__(self, crps, analysis_synth='bus_analyzer_power_mfcc24_mn_nrt', num_features=24):
 		self.corpus = crps
 		self._analysis_synth = analysis_synth
-		self._analysis_features = num_features
+		self._num_analysis_features = num_features
 	
 	def absToOSCTimestamp(self, abs):
 		return struct.pack('!LL', math.floor(abs), long(float(abs - long(abs)) * 4294967296L))
@@ -133,7 +131,7 @@ class NRTOSCParser:
 	
 		## the two buffer alloc calls
 		oscList = [[0.0, ["/b_allocReadChannel", pBuf, sfpath, 0, -1, '[0]']]]
-		oscList += [[0.01, ["/b_alloc", aBuf, int(math.ceil((duration/0.04) / tratio)), self._analysis_features]]]
+		oscList += [[0.01, ["/b_alloc", aBuf, int(math.ceil((duration/0.04) / tratio)), self._num_analysis_features]]]
 		
 		# minimal list of 2 Synthdefs, playback --> analysis
 		sdefs = [synthdef, self._analysis_synth]
@@ -145,7 +143,7 @@ class NRTOSCParser:
 		rows = [['srcbufNum', pBuf, 'outbus', 0, 'dur', duration, 'transp', tratio], ['inbus', 0, 'savebufNum', aBuf, 'transp', tratio]]
 		# params are parameters unique to efx synths
 		if params is not None:
-			# insert params into middle of rows!
+			# insert params into middle of rows! - actually the end, no params for the analysis synth
 			for prow in params:
 				rows.insert(-1,prow)
 		# rewrite the params in rows so that they have correct/logical values		
@@ -156,8 +154,6 @@ class NRTOSCParser:
 					row[index+1] = pBuf
 				elif val == 'savebufNum':
 					row[index+1] = aBuf
-# 				elif val == 'transp':
-# 					row[index+1] = tratio
 				elif val == 'outbus':
 					row[index+1] = currBus
 				elif val == 'inbus':

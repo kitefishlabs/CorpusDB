@@ -21,12 +21,7 @@ class CorpusMetadata:
 
 	def _init_specific(self, type, raw_data=None):
 		print 'initialize CONTAINER'
-		# first is a dummy entry
-		if type is 'index9':
-			self.type = 'index'
-			self.synthdef_string = None
-			self.numfeatures = 9
-		elif type is 'mfcc13':
+		if type is 'mfcc13':
 			self.type = 'mfcc'
 			self.synthdef_string = 'bus_analyzer_power_mfcc13_mn_nrt'
 			self.numfeatures = 13
@@ -47,7 +42,11 @@ class CorpusMetadata:
 			self.synthdef_string = 'bus_analyzer_power_mfcc13_chroma12_mn_nrt'
 			self.numfeatures = 25
 		# power ONLY
-		elif type is 'power6':
+		elif type is 'index9':
+			self.type = 'index'
+			self.synthdef_string = None
+			self.numfeatures = 9
+		elif type is 'power5':
 			self.type = 'power'
 			self.synthdef_string = 'bus_analyzer_power_mn_nrt'
 			self.numfeatures = 5
@@ -144,7 +143,7 @@ class Powers(CorpusMetadata):
 	"""
 		Only for stand-alone usage.
 	"""
-	def __init__(self, type='power6', stat_flag=True, raw_data=None):
+	def __init__(self, type='power5', stat_flag=True, raw_data=None):
 		print 'initialize Power subclass...'
 		if raw_data is not None: print raw_data.shape
 		self.indexes = Indexes()
