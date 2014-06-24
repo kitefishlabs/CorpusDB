@@ -288,7 +288,7 @@ class EfxNode(Node):
 class SynthNode(Node):
 	def __init__(self, synthname, params, verb=False):
 		"""
-	
+		Note that this node type is just a stub!
 		"""
 		try:
 			Node.__init__(self, synthname, params)
