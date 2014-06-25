@@ -25,7 +25,7 @@ class NRTOSCParser:
 	"""
 	anchor = corpus anchor (directory where corpus resides)
 	"""
-	def __init__(self, crps, analysis_synth='bus_analyzer_power_mfcc24_mn_nrt', num_features=24):
+	def __init__(self, crps, analysis_synth='bus_analyzer_power_mfcc24_mn_nrt', num_features=24, verb=False):
 		self.corpus = crps
 		self._analysis_synth = analysis_synth
 		self._num_analysis_features = num_features
@@ -33,7 +33,7 @@ class NRTOSCParser:
 	def absToOSCTimestamp(self, abs):
 		return struct.pack('!LL', math.floor(abs), long(float(abs - long(abs)) * 4294967296L))
 	
-	def padBytes(self, val):
+	def padBytes(self, val, verb=False):
 		if type(val) == type('str'):
 			pad = (math.ceil(((len(val) + 1) / 4.0)) * 4)
 			ba = bytearray(val)
@@ -45,7 +45,7 @@ class NRTOSCParser:
 		elif type(val) == type(0.2):
 			return struct.pack('!f', val)
 
-	def processAndWriteFile(self, score, output, verbose = False):
+	def processAndWriteFile(self, score, output, verb=False):
 		#print "score: ", score
 		header = bytearray("\x00\x00\x00$#bundle\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x10/g_new\x00\x00,i\x00\x00\x00\x00\x00\x01\x00\x00\x00$#bundle\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x10/g_new\x00\x00,i\x00\x00\x00\x00\x00\x01")
 		total_length = 0
@@ -100,7 +100,7 @@ class NRTOSCParser:
 						synthdef = 'monoSamplerNRT',
 						efxSynthdefs = None,
 						params = None,
-						verbose = False):
+						verb=True):
 		"""
 		args:
 			sfpath			-	full path to sound file that is being played/processed/analyzed
@@ -169,6 +169,8 @@ class NRTOSCParser:
 		oscList += [[((duration / tratio) + 0.03), ["/b_write", aBuf, mdpath, "wav", "float32"]]]
 		oscList += [[((duration / tratio) + 0.04), ["/c_set", 0, 0]]]
 		
+		if verb is True:
+			print "OSC List: ", oscList
 		# pass the osc list to function that writes binary .osc file
 		self.processAndWriteFile(oscList, oscDir)
 		# always return pwd to the anchor dir
@@ -177,7 +179,8 @@ class NRTOSCParser:
 
 	def createNRTAssemblyScore(self, 
 						triosList,
-						oscDir = '/Users/me/corpus/snd/score.osc'):
+						oscDir = '/Users/me/corpus/snd/score.osc',
+						verb=True):
 		"""
 		args:
 			triosList		-	np list of [sfid, onset, duration] trios
@@ -220,7 +223,7 @@ class NRTOSCParser:
 				# 					'synthdefs' : [parentnode.synth, childnode.synth],
 				# 					'params' : [None, childnode.params],
 				# 					'tratio' : self.corpus.sftree.nodes[sfid].tratio)
-		if verbose:
+		if verb:
 			print sfInfo
 			print oscList
 		runningdur = 0
@@ -228,7 +231,7 @@ class NRTOSCParser:
 			sfid = segment[0]
 			offset = segment[1]
 			dur = segment[2]
-			if verbose:
+			if verb:
 				print "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
 				print sfInfo[sfid]['synthdef'][0]
 				print int(sfid)
@@ -255,7 +258,7 @@ class NRTOSCParser:
 		
 		oscList += [[(runningdur + 0.02), ["/c_set", 0, 0]]]
 
-		if verbose:
+		if verb:
 			print "======================"
 			print oscList
 				

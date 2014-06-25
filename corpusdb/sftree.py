@@ -143,6 +143,7 @@ class Node:
 		self.unit_mfccs = dict()
 		self.unit_mfcc_vars = dict()
 		self.unit_chromas = dict()
+		self.unit_chroma_vars = dict()
 		self.verify_synthname_and_params()
 
 
@@ -185,7 +186,7 @@ class Node:
 		"""
 		return  [x for x in self.unit_segments] #.sort(key=lambda unit: unit[0])
 	
-	def add_metadata_for_relid(self, relid, powers=None, mfccs=None, mfcc_vars=None, chromas=None, verb=False):
+	def add_metadata_for_relid(self, relid, powers=None, mfccs=None, mfcc_vars=None, chromas=None, chroma_vars=None, verb=False):
 		"""
 		Add one or multiple types of raw metadata to a node
 		"""
@@ -193,6 +194,7 @@ class Node:
 		if relid is not None and mfccs is not None: self.unit_mfccs[relid] = mfccs
 		if relid is not None and mfcc_vars is not None: self.unit_mfcc_vars[relid] = mfcc_vars
 		if relid is not None and chromas is not None: self.unit_chromas[relid] = chromas
+		if relid is not None and chroma_vars is not None: self.unit_chroma_vars[relid] = chroma_vars
 	
 class SamplerNode(Node):
 	"""
@@ -288,7 +290,7 @@ class EfxNode(Node):
 class SynthNode(Node):
 	def __init__(self, synthname, params, verb=False):
 		"""
-		Note that this node type is just a stub!
+		Note that this node type is just a stub
 		"""
 		try:
 			Node.__init__(self, synthname, params)

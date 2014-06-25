@@ -56,7 +56,7 @@ class CorpusDB:
 		self.HOP_MS = self.HOP_SECS * 1000
 		
 		self.reset_corpus()
-		self.parser = nrtoscparser.NRTOSCParser(self, self.alist.synthdef_string, self.num_raw_features)
+		self.parser = nrtoscparser.NRTOSCParser(self, self.feat.synthdef_string, self.num_raw_features)
 		self.sound_file_units_mapped = False
 		
 		#if sudo_flag is True: resource.setrlimit(resource.RLIMIT_NOFILE, (16384, 16384)) #!!!
@@ -67,19 +67,21 @@ class CorpusDB:
 		self.sftree = sftree.SFTree(self, self.anchor)
 		self.cutable = dict()
 		# data structures for raw data and corpus data
-		self.rawtable	=	dict()
-		self.rawmaps	= 	dict()
-		self.powers		= 	dict()
-		self.mfccs		= 	dict()
-		self.chromas	= 	dict()
+		self.rawtable		=	dict()
+		self.rawmaps		= 	dict()
+		self.powers			= 	dict()
+		self.mfccs			= 	dict()
+		self.chromas		= 	dict()
+		self.chroma_vars	= 	dict()
 		# information about the corpus's current state
 		self.sf_offset = 0
 		self.cu_offset = 0
-		self.alist = MFCCs(var_flag=True)
+		self.feat = MFCC_Chromas(var_flag=True)
+		print "FEAT: ", self.feat
 		# double-check size
-		# self.alist.powers.indexes == dtable
-		self.num_raw_features = self.alist.powers.rawwidth + self.alist.rawwidth
-		self.num_cooked_features = self.alist.powers.width + self.alist.width # after variance, stats, etc. are calculated
+		# self.feat.powers.indexes == dtable
+		self.num_raw_features = self.feat.powers.rawwidths[0] + self.feat.rawwidths[0] + self.feat.rawwidths[1]
+		self.num_cooked_features = self.feat.powers.widths[0] + self.feat.widths[0] + self.feat.widths[1] # after variance, stats, etc. are calculated
 	
 	def add_sound_file(self, filename=None, sfid=None, srcFileID=None, tratio=1.0, synthdef=None, params=None, procid=None, subdir=None, reuseFlag=None, importFlag=None, uflag=None, verb=False):
 		"""
@@ -142,19 +144,19 @@ class CorpusDB:
 			rawmaps = self.rawmaps[sfid].T
 			if verb: print "RAW MAPS SHAPE: ", rawmaps.shape
 			power_vector 		= rawmaps[0]
-			mfccs_vector 		= rawmaps[self.alist.powers.rawwidth     	: self.alist.powers.rawwidth+self.alist.rawwidth].T
-			# chroma_vector 		= rawmaps[self.alist.powers.rawwidth+13	: self.alist.powers.rawwidth+self.alist.rawwidth+12].T
+			mfccs_vector 		= rawmaps[self.feat.powers.rawwidths[0]     						: (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0])].T
+			chromas_vector 		= rawmaps[(self.feat.powers.rawwidths[0]+self.feat.rawwidths[0])	: (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0]+self.feat.rawwidths[1])].T
 		except KeyError:
-			#print "key errors are good..."
-			self.rawmaps[sfid] = rawmaps = np.memmap(mdpath, dtype=np.float32, mode='r', offset=280, shape=(num_frames, self.num_raw_features))
+			print "key errors are good..."
+			self.rawmaps[sfid] = rawmaps = np.memmap(mdpath, dtype=np.float32, mode='r', offset=280, shape=(num_frames, (self.feat.powers.rawwidths[0]+self.feat.powers.rawwidths[0]+self.feat.rawwidths[1])))
 			if verb: print "RAW MAPS SHAPE: ", self.rawmaps[sfid].shape
 			power_vector 		= rawmaps.T[0]
-			mfccs_vector 		= rawmaps.T[self.alist.powers.rawwidth      : self.alist.powers.rawwidth+self.alist.rawwidth].T
-			# chroma_vector 		= rawmaps.T[1+13	: 1+13+12].T
+			mfccs_vector 		= rawmaps.T[self.feat.powers.rawwidths[0]     						: (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0])].T
+			chromas_vector 		= rawmaps.T[(self.feat.powers.rawwidths[0]+self.feat.rawwidths[0])	: (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0]+self.feat.rawwidths[1])].T
 		
 		self.powers[sfid]		=	power_vector
 		self.mfccs[sfid]		=	mfccs_vector
-		# self.chromas[sfid]		=	chroma_vector
+		self.chromas[sfid]		=	chromas_vector
 				
 		return self.powers[sfid], self.mfccs[sfid], self.chromas[sfid]
     
@@ -166,7 +168,7 @@ class CorpusDB:
 			del self.rawmaps[sfid]
 			del self.powers[sfid]
 			del self.mfccs[sfid]
-			del self.chromas[sfid]
+			#del self.chromas[sfid]
 		
 		except KeyError:
 			print "Attempt to deactivate memmap or other metadata for key ", sfid, " has failed."
@@ -200,7 +202,7 @@ class CorpusDB:
 
 		if verb: print 'fullpath: ', fullpath, '\n synthid: ', synthid, '\n', self.sftree.sfmap[sfid][0], '\n', self.sftree.sfmap[sfid][1]
 		
-		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(os.path.basename(fullpath))[0] + '_' + `tratio` + '_' + self.alist.synthdef_string + '.osc'))
+		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(os.path.basename(fullpath))[0] + '_' + `tratio` + '_' + self.feat.synthdef_string + '.osc'))
 		if verb: print 'create nrt score args: ', fullpath, ' ', oscpath
 		
 		self.parser.createNRTAnalysisScore(fullpath, 
@@ -214,9 +216,9 @@ class CorpusDB:
 		if outwav:
 			wavfile = ('/Users/kfl/Music/CorpusDB/rawsfids/' + str(sfid) + '.wav')
 		else:
-			wavfile = ' _ '
+			wavfile = '_'
 		
-		cmd = 'scsynth -N ' + oscpath + ' ' + fullpath + wavfile + ' 44100 WAVE int16 -o 1'
+		cmd = 'scsynth -N ' + oscpath + ' ' + fullpath + ' ' + wavfile + ' ' + ' 44100 WAVE int16 -o 1'
 		if verb: print cmd
 		
 		args = shlex.split(cmd)
@@ -298,7 +300,7 @@ class CorpusDB:
 		Note that this function is only going to work when there is raw analyzed metadata. To get the segmentsed
 		"""
 		try:
-			return self.powers[sfid], self.mfccs[sfid], self.chromas[sfid]
+			return self.powers[sfid], self.mfccs[sfid] #, self.chromas[sfid]
 			####$ ***
 		except KeyError:
 			return self._activate_raw_metadata(sfid) # now self.rawmaps[sfid] should exist or res == None if not
@@ -319,25 +321,28 @@ class CorpusDB:
 		
 		"""
 		segmented = self.get_sorted_units_list(sfid)
-		raw_amps, raw_mfccs, raw_chromas = self.get_raw_metadata(sfid)
+		raw_amps, raw_mfccs, raw_chromas = self.get_raw_metadata(sfid) # , raw_chromas
 		amps, reheated = [], []
 		
 		if verb: print 'raw: ', raw_amps
 		amps_stripped = np.nan_to_num(raw_amps)
 		if verb: print 'amps_stripped: ', amps_stripped
 		mfccs_stripped = np.nan_to_num(raw_mfccs)
+		if verb: print 'mfccs_stripped: ', mfccs_stripped
 		chromas_stripped = np.nan_to_num(raw_chromas)
-		
+		if verb: print 'chromas_stripped: ', chromas_stripped
+
 		for relid, sfu in enumerate(segmented):
 
 			offset = int(math.floor(sfu.onset / self.HOP_SECS))
 			dur = int(math.floor(sfu.dur / self.HOP_SECS))
 			if verb: print '[[', offset, '|', dur, ']]'
-			self.sftree.nodes[sfid].add_metadata_for_relid(relid, powers=self.alist.powers.proc_funcs[0](amps_stripped, offset, dur))
+			self.sftree.nodes[sfid].add_metadata_for_relid(relid, powers=self.feat.powers.proc_funcs[0](amps_stripped, offset, dur))
 			#reheated += [np.mean(mfccs_stripped[offset:(offset+dur)], axis=0, dtype=np.float32)]
-			self.sftree.nodes[sfid].add_metadata_for_relid(relid, mfccs=self.alist.proc_funcs[0](mfccs_stripped[offset:(offset+dur)]))
-			self.sftree.nodes[sfid].add_metadata_for_relid(relid, mfcc_vars=self.alist.proc_funcs[1](mfccs_stripped[offset:(offset+dur)]))
-			self.sftree.nodes[sfid].add_metadata_for_relid(relid, chromas=self.alist.proc_funcs[1](chromas_stripped[offset:(offset+dur)]))
+			self.sftree.nodes[sfid].add_metadata_for_relid(relid, mfccs=self.feat.proc_funcs[0](mfccs_stripped[offset:(offset+dur)]))
+			self.sftree.nodes[sfid].add_metadata_for_relid(relid, mfcc_vars=self.feat.proc_funcs[1](mfccs_stripped[offset:(offset+dur)]))
+			self.sftree.nodes[sfid].add_metadata_for_relid(relid, chromas=self.feat.proc_funcs[1](chromas_stripped[offset:(offset+dur)]))
+			self.sftree.nodes[sfid].add_metadata_for_relid(relid, chroma_vars=self.feat.proc_funcs[1](chromas_stripped[offset:(offset+dur)]))
 	
 	def add_corpus_unit(self, uid, metadata, verb=False):
 		"""
@@ -393,11 +398,15 @@ class CorpusDB:
 			relid = 0
 			
 			try:
+				print "----"
+				print self.sftree.nodes[node].unit_powers.keys()
 				for k in self.sftree.nodes[node].unit_powers.keys():
+					print self.sftree.nodes[node]
 					amp_segment = self.sftree.nodes[node].unit_powers[k]
 					mfccs_segment = self.sftree.nodes[node].unit_mfccs[k]
 					mfccs_vars_segment = self.sftree.nodes[node].unit_mfcc_vars[k]
 					chromas_segment = self.sftree.nodes[node].unit_chromas[k]
+					chroma_vars_segment = self.sftree.nodes[node].unit_chroma_vars[k]
 					index = self.cu_offset
 					
 					if verb: print '@ relid/onset: ', relid, '| ', sf_unit_segments[relid].onset
@@ -407,9 +416,11 @@ class CorpusDB:
 					if verb: print 'mfccs segment: ', mfccs_segment
 					if verb: print 'mfcc vars segment: ', mfcc_vars_segment
 					if verb: print 'chromas segment: ', chromas_segment
+					if verb: print 'chroma vars segment: ', chroma_vars_segment
+
 					
 					# if verb: print 'mfccs vars segment: ', mfccs_vars_segment
-					self.add_corpus_unit(index, np.concatenate([row, amp_segment, mfccs_segment, mfccs_vars_segment, chromas_segment]))
+					self.add_corpus_unit(index, np.concatenate([row, amp_segment, mfccs_segment, mfccs_vars_segment, chromas_segment, chroma_vars_segment]))
 					# self.add_corpus_unit(index, np.concatenate([row, amp_segment, mfccs_segment, mfccs_vars_segment]))
 					relid += 1
 					self.cu_offset += 1
@@ -625,7 +636,7 @@ class CorpusDB:
 		if verb: print ''
 		if verb: print self.sftree.procmap
 		if verb: print ''
-		toplevel = { 'descriptors': self.alist.powers.indexes, 'anchorpath': self.anchor, 'procmap': self.sftree.procmap }
+		toplevel = { 'descriptors': self.feat.powers.indexes, 'anchorpath': self.anchor, 'procmap': self.sftree.procmap }
 		sf = dict()
 		for sfid in self.sftree.nodes.keys():
 			sf[sfid] = self.sftree.nodes[sfid].render_json()
