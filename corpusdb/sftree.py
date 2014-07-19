@@ -104,7 +104,7 @@ class SFTree:
 			return None
 		try:
 			# params[0] is a hack!
-			self.nodes[childID] = EfxNode(synthdef, params[0], parentNode.duration, flag, parentNode.channels, parentNode.tratio, childID, parentID)
+			self.nodes[childID] = EfxNode(synthdef, params, parentNode.duration, flag, parentNode.channels, parentNode.tratio, childID, parentID)
 			if verb: print "child hashstring: ", self.nodes[childID].hashstring
 			if procid:
 				procID = procid
@@ -251,7 +251,7 @@ class EfxNode(Node):
 			print 'Atrribute Error in superclass init'
 		self.parent_id = parentID
 		if verb: print ''
-		# print "params: ", self.params
+		if verb: print "params: ", self.params
 		pdict = dict(zip([str(x) for x in self.params[0::2]], self.params[1::2]))
 		if verb: print ''
 		if verb: print pdict
@@ -262,6 +262,7 @@ class EfxNode(Node):
 					self.hashstring += str("%.5f" % pdict[k])
 				else:
 					self.hashstring += str(pdict[k])
+		print "hashstring: ", self.hashstring
 		
 	
 	def __repr__(self):
