@@ -148,7 +148,8 @@ class CorpusDB:
 			chromas_vector 		= rawmaps[(self.feat.powers.rawwidths[0]+self.feat.rawwidths[0])	: (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0]+self.feat.rawwidths[1])].T
 		except KeyError:
 			print "key errors are good..."
-			self.rawmaps[sfid] = rawmaps = np.memmap(mdpath, dtype=np.float32, mode='r', offset=280, shape=(num_frames, (self.feat.powers.rawwidths[0]+self.feat.powers.rawwidths[0]+self.feat.rawwidths[1])))
+			print [self.feat.powers.rawwidths[0],self.feat.rawwidths[0],self.feat.rawwidths[1]]
+			self.rawmaps[sfid] = rawmaps = np.memmap(mdpath, dtype=np.float32, mode='r', offset=280, shape=(num_frames, (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0]+self.feat.rawwidths[1])))
 			if verb: print "RAW MAPS SHAPE: ", self.rawmaps[sfid].shape
 			power_vector 		= rawmaps.T[0]
 			mfccs_vector 		= rawmaps.T[self.feat.powers.rawwidths[0]     						: (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0])].T
@@ -156,6 +157,7 @@ class CorpusDB:
 		
 		self.powers[sfid]		=	power_vector
 		self.mfccs[sfid]		=	mfccs_vector
+		print "cvec: ", chromas_vector
 		self.chromas[sfid]		=	chromas_vector
 				
 		return self.powers[sfid], self.mfccs[sfid], self.chromas[sfid]
@@ -175,7 +177,7 @@ class CorpusDB:
 			return None
 		return sfid
 	
-	def analyze_sound_file(self, filename, sfid, tratio=1.0, subdir='', outwav=False, verb=False):
+	def analyze_sound_file(self, filename, sfid, tratio=1.0, subdir='', outwav=False, topoflag=1, verb=False):
 		"""
 			Read NRT OSC score file, perform analysis asynchronously via shell, wait, signal completion and clean up.
 		
@@ -211,7 +213,8 @@ class CorpusDB:
 									oscDir=oscpath, 
 									synthdef=self.sftree.nodes[synthid].synth, 
 									efxSynthdefs=efx_synth, 
-									params=efx_params)
+									params=efx_params,
+									topoflag=topoflag)
 
 		if outwav:
 			wavfile = ('/Users/kfl/Music/CorpusDB/rawsfids/' + str(sfid) + '.wav')
@@ -300,7 +303,7 @@ class CorpusDB:
 		Note that this function is only going to work when there is raw analyzed metadata. To get the segmentsed
 		"""
 		try:
-			return self.powers[sfid], self.mfccs[sfid] #, self.chromas[sfid]
+			return self.powers[sfid], self.mfccs[sfid], self.chromas[sfid]
 			####$ ***
 		except KeyError:
 			return self._activate_raw_metadata(sfid) # now self.rawmaps[sfid] should exist or res == None if not
@@ -338,10 +341,12 @@ class CorpusDB:
 			dur = int(math.floor(sfu.dur / self.HOP_SECS))
 			if verb: print '[[', offset, '|', dur, ']]'
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, powers=self.feat.powers.proc_funcs[0](amps_stripped, offset, dur))
-			#reheated += [np.mean(mfccs_stripped[offset:(offset+dur)], axis=0, dtype=np.float32)]
+			# WHY ARE THE FUNCTION SIGNATURES DIFFERENT FOR OFFSET AND DUR???
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, mfccs=self.feat.proc_funcs[0](mfccs_stripped[offset:(offset+dur)]))
+			print self.feat.proc_funcs[1]
+			print mfccs_stripped[offset:(offset+dur)]
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, mfcc_vars=self.feat.proc_funcs[1](mfccs_stripped[offset:(offset+dur)]))
-			self.sftree.nodes[sfid].add_metadata_for_relid(relid, chromas=self.feat.proc_funcs[1](chromas_stripped[offset:(offset+dur)]))
+			self.sftree.nodes[sfid].add_metadata_for_relid(relid, chromas=self.feat.proc_funcs[0](chromas_stripped[offset:(offset+dur)]))
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, chroma_vars=self.feat.proc_funcs[1](chromas_stripped[offset:(offset+dur)]))
 	
 	def add_corpus_unit(self, uid, metadata, verb=False):
@@ -404,7 +409,7 @@ class CorpusDB:
 					print self.sftree.nodes[node]
 					amp_segment = self.sftree.nodes[node].unit_powers[k]
 					mfccs_segment = self.sftree.nodes[node].unit_mfccs[k]
-					mfccs_vars_segment = self.sftree.nodes[node].unit_mfcc_vars[k]
+					mfcc_vars_segment = self.sftree.nodes[node].unit_mfcc_vars[k]
 					chromas_segment = self.sftree.nodes[node].unit_chromas[k]
 					chroma_vars_segment = self.sftree.nodes[node].unit_chroma_vars[k]
 					index = self.cu_offset
@@ -420,7 +425,7 @@ class CorpusDB:
 
 					
 					# if verb: print 'mfccs vars segment: ', mfccs_vars_segment
-					self.add_corpus_unit(index, np.concatenate([row, amp_segment, mfccs_segment, mfccs_vars_segment, chromas_segment, chroma_vars_segment]))
+					self.add_corpus_unit(index, np.concatenate([row, amp_segment, mfccs_segment, mfcc_vars_segment, chromas_segment, chroma_vars_segment]))
 					# self.add_corpus_unit(index, np.concatenate([row, amp_segment, mfccs_segment, mfccs_vars_segment]))
 					relid += 1
 					self.cu_offset += 1
@@ -470,25 +475,41 @@ class CorpusDB:
 			X = np.reshape(X, (-1, num_descriptors))
 		
 		print type
-		if type is 'I':			return np.c_[X[:,0], X[:,1:9]]
-		elif type is 'p6': 		return np.c_[X[:,0], X[:,9:15]]
-		elif type is 'm13':		return np.c_[X[:,0], X[:,15:28]]
-		elif type is 'm13var':	return np.c_[X[:,0], X[:,15:41]]
-		elif type is 'm24':		return np.c_[X[:,0], X[:,15:39]]
-		elif type is 'm24var':	return np.c_[X[:,0], X[:,15:63]]
-		elif type is 'c12':		return np.c_[X[:,0], X[:,-12:]] # either 29:, 40:, 42: or 64:
-		elif type is 'c12var':	return np.c_[X[:,0], X[:,-24:]] # either 29:, 40:, 42: or 64:
-		elif type is 'all':		return np.c_[X[:,0], X]
+		if type is 'I':			return (np.c_[X[:,0], X[:,1:9]], 9)
+		elif type is 'p6': 		return (np.c_[X[:,0], X[:,9:15]], 7)
+		elif type is 'm13':		return (np.c_[X[:,0], X[:,15:28]], 14)
+		elif type is 'm13var':	return (np.c_[X[:,0], X[:,15:41]], 27)
+		elif type is 'm24':		return (np.c_[X[:,0], X[:,15:39]], 25)
+		elif type is 'm24var':	return (np.c_[X[:,0], X[:,15:63]], 49)
+		elif type is 'c12':		return (np.c_[X[:,0], X[:,-12:]], 13) # either 29:, 40:, 42: or 64:
+		elif type is 'c12var':	return (np.c_[X[:,0], X[:,-24:]], 27) # either 29:, 40:, 42: or 64:
+		elif type is 'm13c12':	return (np.c_[X[:,0], X[:,15:28], X[-12:]], 26)	
+		elif type is 'all':		return (np.c_[X[:,0], X[1:]], 89)
 		else:
 			raise ArgumentError
 	
+	def convert_corpus_to_array_by_cids(self, type='all', cids=[0], map_flag=False, verb=False):
+		ckeys = sorted(cids.keys())
+		filtered_by_type, length = self.convert_corpus_to_array(type, True)
+		print filtered_by_type.shape
+		print length
+		result = np.array(filtered_by_type[cids[ckeys[0]]][0])
+		# print result
+		# print "---------"
+		for key in ckeys[1:]:
+			print cids[key][0]
+			result = np.append(result, filtered_by_type[cids[key][0]])
+		# print result
+		return np.reshape(result, (-1, length))
+
+
 	def convert_corpus_to_tagged_array(self, type='all', tag=0.0, map_flag=False, verb=False):
 		"""
 		Convert the corpus unit table to a three compacted arrays: power metadata and MFCC metadata.
 		"""
 
 		# get the info segments and filter those that are tagged
-		info = self.convert_corpus_to_array('I', map_flag)
+		info = self.convert_corpus_to_array('I', map_flag)[0]
 		
 		print info.shape
 		
@@ -496,7 +517,7 @@ class CorpusDB:
 # 		indices = np.reshape(indices, (indices.shape[0],))
 
 		# use the tagged indices to pull out the tagged entries
-		filtered_by_type = self.convert_corpus_to_array(type)
+		filtered_by_type = self.convert_corpus_to_array(type)[0]
 		filtered_by_tag = filtered_by_type[indices]
 		filtered_by_tag = np.reshape(filtered_by_tag, (indices.shape[0], filtered_by_type.shape[1]))
 
@@ -504,7 +525,8 @@ class CorpusDB:
 # 		return np.append(indices, filtered_by_tag, axis=1)
 		return filtered_by_tag
 	
-	def cuids_for_sfid(self, seed_sfid, verb=False):
+	def cuids_for_sfid(self, seed_sfid, map_flag=False, verb=False):
+		if map_flag: self.map_sound_file_units_to_corpus_units()
 		return [int(self.cutable[entry][0]) for entry in self.cutable.keys() if self.cutable[entry][2] == seed_sfid]
 			
 	def import_corpus_from_json(self, jsonfilename, appendflag=False, newanchor=None, importflag=False, verb=False):
