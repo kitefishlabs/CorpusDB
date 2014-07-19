@@ -100,6 +100,7 @@ class NRTOSCParser:
 						synthdef = 'monoSamplerNRT',
 						efxSynthdefs = None,
 						params = None,
+						topoflag = 1,
 						verb=True):
 		"""
 		args:
@@ -130,6 +131,7 @@ class NRTOSCParser:
 		mdpath = cwd + '/md/' + fname[0] + '_' + `tratio` + '.md.' + fname[1]
 	
 		## the two buffer alloc calls
+		# oscList = [[0.0, ["/b_allocReadChannel", pBuf, sfpath, 0, -1, '[0]']]]
 		oscList = [[0.0, ["/b_allocReadChannel", pBuf, sfpath, 0, -1, '[0]']]]
 		oscList += [[0.01, ["/b_alloc", aBuf, int(math.ceil((duration/0.04) / tratio)), self._num_analysis_features]]]
 		
@@ -142,29 +144,47 @@ class NRTOSCParser:
 		# ... and their parameters
 		rows = [['srcbufNum', pBuf, 'outbus', 0, 'dur', duration, 'transp', tratio], ['inbus', 0, 'savebufNum', aBuf, 'transp', tratio]]
 		# params are parameters unique to efx synths
+		print "params: ", params
 		if params is not None:
 			# insert params into middle of rows! - actually the end, no params for the analysis synth
 			for prow in params:
 				rows.insert(-1,prow)
 		# rewrite the params in rows so that they have correct/logical values		
 		currBus = 10
-		for r, row in enumerate(rows):
+		print "rows - 1: ", rows[:-1]
+		for r, row in enumerate(rows[:-1]):
 			for index, val in enumerate(row):
 				if val == 'srcbufNum':
 					row[index+1] = pBuf
 				elif val == 'savebufNum':
 					row[index+1] = aBuf
 				elif val == 'outbus':
-					row[index+1] = currBus
+					if r==0:
+						row[index+1] = currBus
+					else:	
+						row[index+1] = currBus+1
 				elif val == 'inbus':
 					row[index+1] = currBus
-					currBus += 1
+					# increment the bus index based on the topo flag
+					# 1 = serial
+					# otherwise, flat
+					if topoflag is 1:
+						currBus += 1
 			# now write the Synths
 			if r == 0:
 				oscList += [[0.02, (["/s_new", sdefs[r], -1, 0, 0] + rows[r])]]
 			else:
 				oscList += [[0.02, (["/s_new", sdefs[r], -1, 1, 0] + rows[r])]]
-		
+		# analysis stage
+		currBus += 1
+		print "rows - 1: ", rows[-1]
+		for index, val in enumerate(rows[-1]):
+			if val == 'savebufNum':
+				rows[-1][index+1] = aBuf
+			elif val == 'inbus':
+				rows[-1][index+1] = currBus
+		oscList += [[0.02, (["/s_new", sdefs[-1], -1, 1, 0] + rows[-1])]]
+
 		# now write the buffer-write and end-point lines
 		oscList += [[((duration / tratio) + 0.03), ["/b_write", aBuf, mdpath, "wav", "float32"]]]
 		oscList += [[((duration / tratio) + 0.04), ["/c_set", 0, 0]]]
