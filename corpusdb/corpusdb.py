@@ -147,8 +147,8 @@ class CorpusDB:
 			mfccs_vector 		= rawmaps[self.feat.powers.rawwidths[0]     						: (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0])].T
 			chromas_vector 		= rawmaps[(self.feat.powers.rawwidths[0]+self.feat.rawwidths[0])	: (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0]+self.feat.rawwidths[1])].T
 		except KeyError:
-			print "key errors are good..."
-			print [self.feat.powers.rawwidths[0],self.feat.rawwidths[0],self.feat.rawwidths[1]]
+			if verb: print "key errors are good..."
+			if verb: print [self.feat.powers.rawwidths[0],self.feat.rawwidths[0],self.feat.rawwidths[1]]
 			self.rawmaps[sfid] = rawmaps = np.memmap(mdpath, dtype=np.float32, mode='r', offset=280, shape=(num_frames, (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0]+self.feat.rawwidths[1])))
 			if verb: print "RAW MAPS SHAPE: ", self.rawmaps[sfid].shape
 			power_vector 		= rawmaps.T[0]
@@ -157,7 +157,7 @@ class CorpusDB:
 		
 		self.powers[sfid]		=	power_vector
 		self.mfccs[sfid]		=	mfccs_vector
-		print "cvec: ", chromas_vector
+		if verb: print "cvec: ", chromas_vector
 		self.chromas[sfid]		=	chromas_vector
 				
 		return self.powers[sfid], self.mfccs[sfid], self.chromas[sfid]
@@ -343,8 +343,8 @@ class CorpusDB:
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, powers=self.feat.powers.proc_funcs[0](amps_stripped, offset, dur))
 			# WHY ARE THE FUNCTION SIGNATURES DIFFERENT FOR OFFSET AND DUR???
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, mfccs=self.feat.proc_funcs[0](mfccs_stripped[offset:(offset+dur)]))
-			print self.feat.proc_funcs[1]
-			print mfccs_stripped[offset:(offset+dur)]
+			if verb: print self.feat.proc_funcs[1]
+			if verb: print mfccs_stripped[offset:(offset+dur)]
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, mfcc_vars=self.feat.proc_funcs[1](mfccs_stripped[offset:(offset+dur)]))
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, chromas=self.feat.proc_funcs[0](chromas_stripped[offset:(offset+dur)]))
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, chroma_vars=self.feat.proc_funcs[1](chromas_stripped[offset:(offset+dur)]))
@@ -403,10 +403,10 @@ class CorpusDB:
 			relid = 0
 			
 			try:
-				print "----"
-				print self.sftree.nodes[node].unit_powers.keys()
+				if verb: print "----"
+				if verb: print self.sftree.nodes[node].unit_powers.keys()
 				for k in self.sftree.nodes[node].unit_powers.keys():
-					print self.sftree.nodes[node]
+					if verb: print self.sftree.nodes[node]
 					amp_segment = self.sftree.nodes[node].unit_powers[k]
 					mfccs_segment = self.sftree.nodes[node].unit_mfccs[k]
 					mfcc_vars_segment = self.sftree.nodes[node].unit_mfcc_vars[k]
@@ -474,7 +474,7 @@ class CorpusDB:
 			X = np.array(xlist, dtype='float32')
 			X = np.reshape(X, (-1, num_descriptors))
 		
-		print type
+		if verb: print type
 		if type is 'I':			return (np.c_[X[:,0], X[:,1:9]], 9)
 		elif type is 'p6': 		return (np.c_[X[:,0], X[:,9:15]], 7)
 		elif type is 'm13':		return (np.c_[X[:,0], X[:,15:28]], 14)
@@ -491,13 +491,13 @@ class CorpusDB:
 	def convert_corpus_to_array_by_cids(self, type='all', cids=[0], map_flag=False, verb=False):
 		ckeys = sorted(cids.keys())
 		filtered_by_type, length = self.convert_corpus_to_array(type, True)
-		print filtered_by_type.shape
-		print length
+		if verb: print filtered_by_type.shape
+		if verb: print length
 		result = np.array(filtered_by_type[cids[ckeys[0]]][0])
 		# print result
 		# print "---------"
 		for key in ckeys[1:]:
-			print cids[key][0]
+			if verb: print cids[key][0]
 			result = np.append(result, filtered_by_type[cids[key][0]])
 		# print result
 		return np.reshape(result, (-1, length))
@@ -511,7 +511,7 @@ class CorpusDB:
 		# get the info segments and filter those that are tagged
 		info = self.convert_corpus_to_array('I', map_flag)[0]
 		
-		print info.shape
+		if verb: print info.shape
 		
 		indices = np.argwhere(info[:,5]==tag)
 # 		indices = np.reshape(indices, (indices.shape[0],))
@@ -548,7 +548,7 @@ class CorpusDB:
 		
 		j = jsonpickle.decode(f.read())
 		
-		print j.keys()
+		if verb: print j.keys()
 		
 		if newanchor is not None:
 			self.anchor = newanchor
@@ -594,9 +594,9 @@ class CorpusDB:
 		corpusunits = j['corpusunits']
 		
 		if type(corpusunits) == type([]):
-			print corpusunits[0]
-			print corpusunits[1]
-			print corpusunits[2]
+			if verb: print corpusunits[0]
+			if verb: print corpusunits[1]
+			if verb: print corpusunits[2]
 			fp = np.memmap(os.path.join(self.anchor, 'json', str(corpusunits[0])), dtype=np.float32, shape=(int(corpusunits[1]),int(corpusunits[2])))
 			self.X = fp
 			del fp
@@ -674,15 +674,15 @@ class CorpusDB:
 			toplevel['corpusunits'] = d
 		else:
 			converted = self.convert_corpus_to_array('all')
-			print "converted shape: ", converted.shape
+			if verb: print "converted shape: ", converted.shape
 			fp = np.memmap(memmappath, dtype=np.float32, mode='w+', shape=converted.shape)
 			fp[:] = converted
 			fp.flush()
 			del fp
 			toplevel['corpusunits'] = [memmapfilename, converted.shape[0], converted.shape[1]]
-			print toplevel['corpusunits']
+			if verb: print toplevel['corpusunits']
 			
 
-		print toplevel.keys()
+		if verb: print toplevel.keys()
 		f.write(jsonpickle.encode(toplevel))	
 		f.close()
