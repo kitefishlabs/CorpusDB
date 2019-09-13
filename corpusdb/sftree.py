@@ -42,15 +42,15 @@ class SFTree:
 		"""
 		
 		"""
-		if verb: print "add file: ", filename, "for sfid: ", sfID
-		if verb: print "root node procid: ", procid
+		if verb: print ("add file: ", filename, "for sfid: ", sfID)
+		if verb: print ("root node procid: ", procid)
 		if snd_subdir:
 			rel_path = os.path.join(snd_subdir, filename)
 			joined_path = os.path.join(self.anchorPath, 'snd', snd_subdir, filename)
 		else:
 			rel_path = filename
 			joined_path = os.path.join(self.anchorPath, 'snd', filename)
-		if verb: print "joined: ", joined_path
+		if verb: print ("joined: ", joined_path)
 		if uniqueFlag:
 			flag = uniqueFlag
 		else:
@@ -64,25 +64,25 @@ class SFTree:
 		
 		if chnls == 1: synthdef = 'sampler_mn_nrt'
 		else: synthdef = 'sampler_st_nrt'
-		if verb: print 'SD: ', synthdef
+		if verb: print ('SD: ', synthdef)
 		
 		try:
 			self.nodes[sfID] = SamplerNode(rel_path, synthdef, dur, flag, chnls, tratio, sfID)
-			if verb: print "hashstring: ", self.nodes[sfID].hashstring
+			if verb: print ("hashstring: ", self.nodes[sfID].hashstring)
 			if procid:
 				procID = procid
 			else:
 				procID = self.procmap_offset
 				self.procmap_offset += 1
 
-			if verb: print "procID: ", procID
+			if verb: print ("procID: ", procID)
 			procID = self.check_procmap(procID, self.nodes[sfID].hashstring)
-			if verb: print "procID: ", procID
+			if verb: print ("procID: ", procID)
 			# secondary mappings
 			self.sfmap[sfID] = [rel_path, dur, tratio, synthdef, procID] # a more compact representation
 			return self.nodes[sfID]
 		except:
-		    print "Unexpected error:", sys.exc_info()[0]
+		    print ("Unexpected error:", sys.exc_info()[0])
 		    raise
 		return None
 	
@@ -91,7 +91,7 @@ class SFTree:
 		"""
 	
 		"""
-		if verb: print "child node procid: ", procid
+		if verb: print ("child node procid: ", procid)
 		if uniqueFlag:
 			flag = uniqueFlag
 		else:
@@ -100,27 +100,27 @@ class SFTree:
 		try:
 			parentNode = self.nodes[parentID]
 		except KeyError:
-			if verb: print 'Parent\'s childID is not found. Child node was not added'
+			if verb: print ('Parent\'s childID is not found. Child node was not added')
 			return None
 		try:
 			# params[0] is a hack!
 			self.nodes[childID] = EfxNode(synthdef, params, parentNode.duration, flag, parentNode.channels, parentNode.tratio, childID, parentID)
-			if verb: print "child hashstring: ", self.nodes[childID].hashstring
+			if verb: print ("child hashstring: ", self.nodes[childID].hashstring)
 			if procid:
 				procID = procid
 			else:
 				procID = self.procmap_offset
 				self.procmap_offset += 1
-			if verb: print "procID: ", procID
+			if verb: print ("procID: ", procID)
 			procID = self.check_procmap(procID, self.nodes[childID].hashstring)
-			if verb: print "procID: ", procID
+			if verb: print ("procID: ", procID)
 			# secondary mappings
 			self.sfmap[childID] = [synthdef, params, procID]
 			
 			return self.nodes[self.nodes[childID].sfid]
 
 		except:
-		    print "Unexpected error:", sys.exc_info()[0]
+		    print ("Unexpected error:", sys.exc_info()[0])
 		    raise
 		return None
 
@@ -158,7 +158,7 @@ class Node:
 		pass
 	
 	def add_onset_and_dur_pair(self, onset, dur, relid=None, verb=False):
-# 		print '$$$ ', onset, '|', dur, '|(', relid, ')'
+# 		print ('$$$ ', onset, '|', dur, '|(', relid, ')')
 		if relid is None: relid = len(self.unit_segments)
 		try:
 			self.unit_segments[relid].onset = min(max(0, onset), self.duration)
@@ -207,7 +207,7 @@ class SamplerNode(Node):
 		try:
 			Node.__init__(self, synthname, None, duration, uniqueID, channels, tratio, sfID)
 		except AttributeError:
-			print 'Atrribute Error in superclass init'
+			print ('Atrribute Error in superclass init')
 		self.sfpath = sfpath
 		self.hashstring = str(self.synth) + ("%.5f" % self.tratio)
 		self.verify_sf()
@@ -248,13 +248,13 @@ class EfxNode(Node):
 		try:
 			Node.__init__(self, synthname, params, duration, uniqueID, channels, tratio, childID)
 		except AttributeError:
-			print 'Atrribute Error in superclass init'
+			print ('Atrribute Error in superclass init')
 		self.parent_id = parentID
-		if verb: print ''
-		if verb: print "params: ", self.params
+		if verb: print ('')
+		if verb: print ("params: ", self.params)
 		pdict = dict(zip([str(x) for x in self.params[0::2]], self.params[1::2]))
-		if verb: print ''
-		if verb: print pdict
+		if verb: print ('')
+		if verb: print (pdict)
 		for k in pdict:
 			if (k != 'outbus') and (k != 'inbus') and (k != 'dur') and (k != 'envDur') and (k != 'transp'):
 				self.hashstring += k
@@ -262,7 +262,7 @@ class EfxNode(Node):
 					self.hashstring += str("%.5f" % pdict[k])
 				else:
 					self.hashstring += str(pdict[k])
-		print "hashstring: ", self.hashstring
+		print ("hashstring: ", self.hashstring)
 		
 	
 	def __repr__(self):
@@ -296,7 +296,7 @@ class SynthNode(Node):
 		try:
 			Node.__init__(self, synthname, params)
 		except AttributeError:
-			print 'Atrribute Error in superclass init'
+			print ('Atrribute Error in superclass init')
 
 	def __repr__(self):
 		"""

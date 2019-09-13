@@ -39,11 +39,21 @@ __license__ = "gpl 3.0 or higher"
 __email__ = 'tms@kitefishlabs.com'
 
 
-import os, sys, string, math, resource
-import shlex, subprocess, jsonpickle, json
+import os
+import sys
+import string
+import math
+import resource
+
+
+import shlex
+import subprocess
+import jsonpickle
+import json
 import numpy as np
-import nrtoscparser, sftree
-from corpusfeatures import *
+import corpusdb.nrtoscparser as nrtoscparser
+import corpusdb.sftree as sft
+from corpusdb.corpusfeatures import *
 
 class CorpusDB:
 	"""
@@ -64,7 +74,7 @@ class CorpusDB:
 	
 	def reset_corpus(self, verb=False):
 		
-		self.sftree = sftree.SFTree(self, self.anchor)
+		self.sftree = sft.SFTree(self, self.anchor)
 		self.cutable = dict()
 		# data structures for raw data and corpus data
 		self.rawtable		=	dict()
@@ -77,7 +87,7 @@ class CorpusDB:
 		self.sf_offset = 0
 		self.cu_offset = 0
 		self.feat = MFCC_Chromas(var_flag=True)
-		print "FEAT: ", self.feat
+		print ("FEAT: ", self.feat)
 		# double-check size
 		# self.feat.powers.indexes == dtable
 		self.num_raw_features = self.feat.powers.rawwidths[0] + self.feat.rawwidths[0] + self.feat.rawwidths[1]
@@ -97,17 +107,17 @@ class CorpusDB:
 		if srcFileID is None:
 			
 			root_node = self.sftree.add_root_node(filename, sfid, tratio, procid=procid, snd_subdir=subdir, uniqueFlag=uflag)
-			if verb: print "add_root_node res: ", root_node.sfpath, ', ', root_node.sfid, ', ', root_node.tratio
+			if verb: print ("add_root_node res: ", root_node.sfpath, ', ', root_node.sfid, ', ', root_node.tratio)
 			return root_node
 			
 			# if verb: print "import flag: ", importFlag, 
 			if importFlag: self.import_sound_file_to_buffer(root_node.sfpath, sfid)
 		
 		else:
-			if verb: print 'ADD CHILD: ', srcFileID, ' | ', sfid, ' | ', tratio, ' | ', synthdef, ' | ', params
+			if verb: print ('ADD CHILD: ', srcFileID, ' | ', sfid, ' | ', tratio, ' | ', synthdef, ' | ', params)
 			# sfid, tratio
 			child_node = self.sftree.add_child_node(srcFileID, sfid, tratio, synthdef, params, procid=procid, uniqueFlag=uflag)
-			if verb: print "add_child_node res: ", child_node.parent_id, ', ', child_node.sfid, ', ', child_node.tratio
+			if verb: print ("add_child_node res: ", child_node.parent_id, ', ', child_node.sfid, ', ', child_node.tratio)
 			return child_node
 	
 	def remove_sound_file(self, sfid, verb=False):
@@ -135,29 +145,29 @@ class CorpusDB:
 		try: 
 			pair = self.rawtable[sfid]
 		except KeyError(key):
-			print "Error, this key (", key, ")does not have raw metadata associated with it.\nCannot activate."
+			print ("Error, this key (", key, ")does not have raw metadata associated with it.\nCannot activate.")
 			return None
 		mdpath = pair[0]
-		if verb: print 'mdpath: ', mdpath
+		if verb: print ('mdpath: ', mdpath)
 		num_frames = pair[1]
 		try:
 			rawmaps = self.rawmaps[sfid].T
-			if verb: print "RAW MAPS SHAPE: ", rawmaps.shape
+			if verb: print ("RAW MAPS SHAPE: ", rawmaps.shape)
 			power_vector 		= rawmaps[0]
 			mfccs_vector 		= rawmaps[self.feat.powers.rawwidths[0]     						: (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0])].T
 			chromas_vector 		= rawmaps[(self.feat.powers.rawwidths[0]+self.feat.rawwidths[0])	: (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0]+self.feat.rawwidths[1])].T
 		except KeyError:
-			if verb: print "key errors are good..."
-			if verb: print [self.feat.powers.rawwidths[0],self.feat.rawwidths[0],self.feat.rawwidths[1]]
+			if verb: print ("key errors are good...")
+			if verb: print ([self.feat.powers.rawwidths[0],self.feat.rawwidths[0],self.feat.rawwidths[1]])
 			self.rawmaps[sfid] = rawmaps = np.memmap(mdpath, dtype=np.float32, mode='r', offset=280, shape=(num_frames, (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0]+self.feat.rawwidths[1])))
-			if verb: print "RAW MAPS SHAPE: ", self.rawmaps[sfid].shape
+			if verb: print ("RAW MAPS SHAPE: ", self.rawmaps[sfid].shape)
 			power_vector 		= rawmaps.T[0]
 			mfccs_vector 		= rawmaps.T[self.feat.powers.rawwidths[0]     						: (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0])].T
 			chromas_vector 		= rawmaps.T[(self.feat.powers.rawwidths[0]+self.feat.rawwidths[0])	: (self.feat.powers.rawwidths[0]+self.feat.rawwidths[0]+self.feat.rawwidths[1])].T
 		
 		self.powers[sfid]		=	power_vector
 		self.mfccs[sfid]		=	mfccs_vector
-		if verb: print "cvec: ", chromas_vector
+		if verb: print ("cvec: ", chromas_vector)
 		self.chromas[sfid]		=	chromas_vector
 				
 		return self.powers[sfid], self.mfccs[sfid], self.chromas[sfid]
@@ -173,7 +183,7 @@ class CorpusDB:
 			#del self.chromas[sfid]
 		
 		except KeyError:
-			print "Attempt to deactivate memmap or other metadata for key ", sfid, " has failed."
+			print ("Attempt to deactivate memmap or other metadata for key ", sfid, " has failed.")
 			return None
 		return sfid
 	
@@ -185,10 +195,10 @@ class CorpusDB:
 			
 			Subdir arg is an empty string ('') if not used.
 		"""
-		if verb: print 'file name: ', filename
+		if verb: print ('file name: ', filename)
 		self.parser.anchor = self.anchor
 
-		#print sfid, ' '	, tratio, ' ', self.rate, ' ', self.sftree.nodes[sfid].duration, ' ', oscpath
+		#print (sfid, ' '	, tratio, ' ', self.rate, ' ', self.sftree.nodes[sfid].duration, ' ', oscpath)
 		if subdir is None:
 			subdir = ''
 		try:
@@ -202,10 +212,10 @@ class CorpusDB:
 			efx_params = None
 			fullpath = os.path.join(self.anchor, 'snd', subdir, self.sftree.nodes[sfid].sfpath)
 
-		if verb: print 'fullpath: ', fullpath, '\n synthid: ', synthid, '\n', self.sftree.sfmap[sfid][0], '\n', self.sftree.sfmap[sfid][1]
+		if verb: print ('fullpath: ', fullpath, '\n synthid: ', synthid, '\n', self.sftree.sfmap[sfid][0], '\n', self.sftree.sfmap[sfid][1])
 		
-		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(os.path.basename(fullpath))[0] + '_' + `tratio` + '_' + self.feat.synthdef_string + '.osc'))
-		if verb: print 'create nrt score args: ', fullpath, ' ', oscpath
+		oscpath = os.path.join(self.anchor, 'osc', (os.path.splitext(os.path.basename(fullpath))[0] + '_' + tratio + '_' + self.feat.synthdef_string + '.osc'))
+		if verb: print ('create nrt score args: ', fullpath, ' ', oscpath)
 		
 		self.parser.createNRTAnalysisScore(fullpath, 
 									tratio=tratio, 
@@ -222,41 +232,41 @@ class CorpusDB:
 			wavfile = '_'
 		
 		cmd = 'scsynth -N ' + oscpath + ' ' + fullpath + ' ' + wavfile + ' ' + ' 44100 WAVE int16 -o 1'
-		if verb: print cmd
+		if verb: print (cmd)
 		
 		args = shlex.split(cmd)
 		sppo = subprocess.Popen(args, stdout=None, stderr=None, shell=False, close_fds=True, preexec_fn=resource.setrlimit(resource.RLIMIT_NOFILE, (10000,10000)))
-		if verb: print "sppo:: ", sppo
+		if verb: print ("sppo:: ", sppo)
 		
 		rc = sppo.wait()
-		if verb: print 'RC: ', rc
+		if verb: print ('RC: ', rc)
 		if rc == 1:
 			cwd = os.path.abspath(fullpath)
 			fname = string.split(os.path.basename(fullpath), '.')
 			cwd = os.path.dirname(cwd)
-			mdpath = cwd + "/md/" + fname[0] + '_' + `tratio` + '.md.' + fname[1]
-			if verb: print 'MDPATH for mapping: ', mdpath
+			mdpath = cwd + "/md/" + fname[0] + '_' + tratio + '.md.' + fname[1]
+			if verb: print ('MDPATH for mapping: ', mdpath)
 			num_frames = int(math.ceil(self.sftree.nodes[sfid].duration / self.HOP_SECS / tratio))
-			if verb: print 'num frames: ', num_frames
+			if verb: print ('num frames: ', num_frames)
 			# map it:
 			self.map_raw_sound_file(mdpath, sfid, num_frames)
 			## sftrees/sfmap: handled in add_sound_file()!
 			## what to do if returncode != 1 ???
 		else:
-			print 'Analysis was not successful; failed to map raw sound file!!!'
+			print ('Analysis was not successful; failed to map raw sound file!!!')
 	
 	def add_sound_file_unit(self, sfid, onset=0, dur=0, tag=0, verb=False):
 		"""
 		Add a sound file unit to the proper sftree node.
 		Always unsets the mapped flag.
 		"""
-		if verb: print 'SFID: ', sfid, ' | onset: ', onset, ' | dur: ', dur
+		if verb: print ('SFID: ', sfid, ' | onset: ', onset, ' | dur: ', dur)
 		try:
 			res = self.sftree.nodes[sfid].add_onset_and_dur_pair(onset, dur)
-			if verb: print '$$$$$$$$$$$$$ TAG: ', tag
+			if verb: print ('$$$$$$$$$$$$$ TAG: ', tag)
 			self.sftree.nodes[sfid].update_unit_segment_params(len(self.sftree.nodes[sfid].unit_segments)-1, tag=tag)
 		except KeyError:
-			print 'Error: there is no Node for ', sfid, ' in the sf tree. Add SFU failed'
+			print ('Error: there is no Node for ', sfid, ' in the sf tree. Add SFU failed')
 			return None
 		self.sound_file_units_mapped = False
 		return sfid
@@ -273,10 +283,10 @@ class CorpusDB:
 				self.sftree.nodes[sfid].update_unit_segment_params(relid, onset, dur, tag)
 				return sfid, relid
 			except KeyError:
-				print 'Error: there is no entry for ', sfid, ' in the sf map. Update SFU failed.'
+				print ('Error: there is no entry for ', sfid, ' in the sf map. Update SFU failed.')
 				return None
 			except IndexError:
-				print 'Error: ', relid, ' is a bad relid for sfid ', sfid, '.'
+				print ('Error: ', relid, ' is a bad relid for sfid ', sfid, '.')
 				return None
 	
 	def remove_sound_file_unit(self, sfid, path=None, relid=None, bounds=None, verb=False):
@@ -327,24 +337,25 @@ class CorpusDB:
 		raw_amps, raw_mfccs, raw_chromas = self.get_raw_metadata(sfid) # , raw_chromas
 		amps, reheated = [], []
 		
-		if verb: print 'raw: ', raw_amps
+		if verb: print ('raw: ', raw_amps)
 		amps_stripped = np.nan_to_num(raw_amps)
-		if verb: print 'amps_stripped: ', amps_stripped
+		if verb: print ('amps_stripped: ', amps_stripped)
 		mfccs_stripped = np.nan_to_num(raw_mfccs)
-		if verb: print 'mfccs_stripped: ', mfccs_stripped
+		if verb: print ('mfccs_stripped: ', mfccs_stripped)
 		chromas_stripped = np.nan_to_num(raw_chromas)
-		if verb: print 'chromas_stripped: ', chromas_stripped
+		if verb: print ('chromas_stripped: ', chromas_stripped)
 
 		for relid, sfu in enumerate(segmented):
 
 			offset = int(math.floor(sfu.onset / self.HOP_SECS))
 			dur = int(math.floor(sfu.dur / self.HOP_SECS))
-			if verb: print '[[', offset, '|', dur, ']]'
+			if verb: print ('[[', offset, '|', dur, ']]')
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, powers=self.feat.powers.proc_funcs[0](amps_stripped, offset, dur))
 			# WHY ARE THE FUNCTION SIGNATURES DIFFERENT FOR OFFSET AND DUR???
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, mfccs=self.feat.proc_funcs[0](mfccs_stripped[offset:(offset+dur)]))
-			if verb: print self.feat.proc_funcs[1]
-			if verb: print mfccs_stripped[offset:(offset+dur)]
+			if verb: print (self.feat.proc_funcs[1])
+
+			# if verb: print (mfccs_stripped[offset:(offset+dur)])
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, mfcc_vars=self.feat.proc_funcs[1](mfccs_stripped[offset:(offset+dur)]))
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, chromas=self.feat.proc_funcs[0](chromas_stripped[offset:(offset+dur)]))
 			self.sftree.nodes[sfid].add_metadata_for_relid(relid, chroma_vars=self.feat.proc_funcs[1](chromas_stripped[offset:(offset+dur)]))
@@ -364,7 +375,7 @@ class CorpusDB:
 		try:
 			del self.cutable[cid]
 		except KeyError:
-			print 'Error: attempting to remove corpus unit that does not exist at index ', cid, '.'
+			print ('Error: attempting to remove corpus unit that does not exist at index ', cid, '.')
 	
 	def clear_corpus_units(self, verb=False):
 		"""
@@ -387,10 +398,10 @@ class CorpusDB:
 		"""
 		Build the corpus unit table from entries found in the sound file unit table.
 		"""
-		print "map sound file units to corpus units"
+		print ("map sound file units to corpus units")
 		self.clear_corpus_units()
-		if verb: print '---------------------------------'
-		if verb: print self.sftree.nodes.keys()
+		if verb: print ('---------------------------------')
+		if verb: print (self.sftree.nodes.keys())
 		for node in self.sftree.nodes.keys():
 			sf_id = self.sftree.nodes[node].sfid
 			sf_tratio = self.sftree.nodes[node].tratio
@@ -403,10 +414,10 @@ class CorpusDB:
 			relid = 0
 			
 			try:
-				if verb: print "----"
-				if verb: print self.sftree.nodes[node].unit_powers.keys()
+				if verb: print ("----")
+				if verb: print (self.sftree.nodes[node].unit_powers.keys())
 				for k in self.sftree.nodes[node].unit_powers.keys():
-					if verb: print self.sftree.nodes[node]
+					if verb: print (self.sftree.nodes[node])
 					amp_segment = self.sftree.nodes[node].unit_powers[k]
 					mfccs_segment = self.sftree.nodes[node].unit_mfccs[k]
 					mfcc_vars_segment = self.sftree.nodes[node].unit_mfcc_vars[k]
@@ -414,26 +425,26 @@ class CorpusDB:
 					chroma_vars_segment = self.sftree.nodes[node].unit_chroma_vars[k]
 					index = self.cu_offset
 					
-					if verb: print '@ relid/onset: ', relid, '| ', sf_unit_segments[relid].onset
+					if verb: print ('@ relid/onset: ', relid, '| ', sf_unit_segments[relid].onset)
 					row = np.array([index, parent_id, sf_id, relid, sf_proc_id, sf_unit_segments[relid].tag, sf_unit_segments[relid].onset, sf_unit_segments[relid].dur, sf_tratio])
-					if verb: print 'row: ', row.shape
-					if verb: print 'amp segment: ', amp_segment
-					if verb: print 'mfccs segment: ', mfccs_segment
-					if verb: print 'mfcc vars segment: ', mfcc_vars_segment
-					if verb: print 'chromas segment: ', chromas_segment
-					if verb: print 'chroma vars segment: ', chroma_vars_segment
+					if verb: print ('row: ', row.shape)
+					if verb: print ('amp segment: ', amp_segment)
+					if verb: print ('mfccs segment: ', mfccs_segment)
+					if verb: print ('mfcc vars segment: ', mfcc_vars_segment)
+					if verb: print ('chromas segment: ', chromas_segment)
+					if verb: print ('chroma vars segment: ', chroma_vars_segment)
 
 					
-					# if verb: print 'mfccs vars segment: ', mfccs_vars_segment
+					# if verb: print ('mfccs vars segment: ', mfccs_vars_segment)
 					self.add_corpus_unit(index, np.concatenate([row, amp_segment, mfccs_segment, mfcc_vars_segment, chromas_segment, chroma_vars_segment]))
 					# self.add_corpus_unit(index, np.concatenate([row, amp_segment, mfccs_segment, mfccs_vars_segment]))
 					relid += 1
 					self.cu_offset += 1
 			except KeyError:
-				print 'KeyError on segments traversal, trying to continue'
+				print ('KeyError on segments traversal, trying to continue')
 				pass
 			except:
-				print "Unexpected error:", sys.exc_info()[0]
+				print ("Unexpected error:", sys.exc_info()[0])
 				raise
 
 	# types: 0 = all, 1 = SamplerNodes, 2 = EfxNodes
@@ -474,7 +485,7 @@ class CorpusDB:
 			X = np.array(xlist, dtype='float32')
 			X = np.reshape(X, (-1, num_descriptors))
 		
-		if verb: print type
+		if verb: print (type)
 		if type is 'I':			return (np.c_[X[:,0], X[:,1:9]], 9)
 		elif type is 'p6': 		return (np.c_[X[:,0], X[:,9:15]], 7)
 		elif type is 'm13':		return (np.c_[X[:,0], X[:,15:28]], 14)
@@ -486,20 +497,20 @@ class CorpusDB:
 		elif type is 'm13c12':	return (np.c_[X[:,0], X[:,15:28], X[-12:]], 26)	
 		elif type is 'all':		return (np.c_[X[:,0], X[1:]], 89)
 		else:
-			raise ArgumentError
+			raise ValueError(type)
 	
 	def convert_corpus_to_array_by_cids(self, type='all', cids=[0], map_flag=False, verb=False):
 		ckeys = sorted(cids.keys())
 		filtered_by_type, length = self.convert_corpus_to_array(type, True)
-		if verb: print filtered_by_type.shape
-		if verb: print length
+		if verb: print (filtered_by_type.shape)
+		if verb: print (length)
 		result = np.array(filtered_by_type[cids[ckeys[0]]][0])
-		# print result
-		# print "---------"
+		# print (result)
+		# print ("---------")
 		for key in ckeys[1:]:
-			if verb: print cids[key][0]
+			if verb: print (cids[key][0])
 			result = np.append(result, filtered_by_type[cids[key][0]])
-		# print result
+		# print (result)
 		return np.reshape(result, (-1, length))
 
 
@@ -511,7 +522,7 @@ class CorpusDB:
 		# get the info segments and filter those that are tagged
 		info = self.convert_corpus_to_array('I', map_flag)[0]
 		
-		if verb: print info.shape
+		if verb: print (info.shape)
 		
 		indices = np.argwhere(info[:,5]==tag)
 # 		indices = np.reshape(indices, (indices.shape[0],))
@@ -535,12 +546,12 @@ class CorpusDB:
 		Append flag??? Should it be removed as a parameter.
 		"""
 		if appendflag is False:
- 			print 'appendflag is FALSE'
-			print 'sf_offset: ', self.sf_offset
+			print ('appendflag is FALSE')
+			print ('sf_offset: ', self.sf_offset)
 			self.reset_corpus()
 		else:
-			print 'appendflag is TRUE'
-			print 'sf_offset: ', self.sf_offset
+			print ('appendflag is TRUE')
+			print ('sf_offset: ', self.sf_offset)
 			
 		#set up
 		jsonpath = os.path.join(self.anchor, 'json', jsonfilename)
@@ -548,14 +559,14 @@ class CorpusDB:
 		
 		j = jsonpickle.decode(f.read())
 		
-		if verb: print j.keys()
+		if verb: print (j.keys())
 		
 		if newanchor is not None:
 			self.anchor = newanchor
 		# warn user if conflicting anchor path?
 		
 		current_procmap_offset = self.sftree.procmap_offset
-		if verb: print "current_procmap_offset: ", current_procmap_offset
+		if verb: print ("current_procmap_offset: ", current_procmap_offset)
 		
 		procmap = j['procmap']
 		for key in sorted(procmap.keys()):
@@ -565,15 +576,15 @@ class CorpusDB:
 		for key in sorted([int(x) for x in soundfiles.keys()]):
 			sf = soundfiles[str(key)]
 			
-			procid = [int(k) for k,v in procmap.iteritems() if v == sf['hash']][0]
-			if verb: print "k procid result: ", procid
-			# print sf
+			procid = [int(k) for k,v in procmap.items() if v == sf['hash']][0]
+			if verb: print ("k procid result: ", procid)
+			# print (sf)
 			
 			try:
 				pid = sf['parentID']
-				# print ">>> params: ", sf['params']
+				# print (">>> params: ", sf['params'])
 				params = [[str(p) if (type(p) == type(u'')) else p for p in sf['params']]]
-				# print ">>> params: ", params
+				# print (">>> params: ", params)
 				
 				sfid = self.add_sound_file(filename=None, 
 												sfid=(sf['sfID'] + self.sf_offset),
@@ -594,51 +605,51 @@ class CorpusDB:
 		corpusunits = j['corpusunits']
 		
 		if type(corpusunits) == type([]):
-			if verb: print corpusunits[0]
-			if verb: print corpusunits[1]
-			if verb: print corpusunits[2]
+			if verb: print (corpusunits[0])
+			if verb: print (corpusunits[1])
+			if verb: print (corpusunits[2])
 			fp = np.memmap(os.path.join(self.anchor, 'json', str(corpusunits[0])), dtype=np.float32, shape=(int(corpusunits[1]),int(corpusunits[2])))
 			self.X = fp
 			del fp
- 			for key in np.array(self.X[:,0], dtype=int).tolist():
- 				if verb: print '-----------------------'
-				if verb: print type(key)
-				if verb: print corpusunits[str(key)]
+			for key in np.array(self.X[:,0], dtype=int).tolist():
+				if verb: print ('-----------------------')
+				if verb: print (type(key))
+				if verb: print (corpusunits[str(key)])
 				cunit = np.array(self.X[key]).tolist()
-				if verb: print "cunit: ", cunit
+				if verb: print ("cunit: ", cunit)
 				cunit[0] += self.cu_offset
-				if verb: print "cunit[0]: ", cunit[0]
+				if verb: print ("cunit[0]: ", cunit[0])
 				cunit[1] += current_procmap_offset
-				if verb: print "cunit[1]: ", cunit[1]
+				if verb: print ("cunit[1]: ", cunit[1])
 				cunit[2] += self.sf_offset
-				if verb: print "cunit[2]: ", cunit[2]
+				if verb: print ("cunit[2]: ", cunit[2])
 				self.add_corpus_unit(int(key) + self.cu_offset, cunit)
 
 		else:
 			# its a dictionary of cuid->metadata mappings
-			# print "proc map offset: ", self.sftree.procmap_offset
+			# print ("proc map offset: ", self.sftree.procmap_offset)
 			for key in sorted([int(x) for x in list(corpusunits.keys())] ):
-				if verb: print '-----------------------'
-				if verb: print type(key)
-				if verb: print corpusunits[str(key)]
+				if verb: print ('-----------------------')
+				if verb: print (type(key))
+				if verb: print (corpusunits[str(key)])
 				cunit = corpusunits[str(key)]
 				try:
 					cunit = [float(x) for x in cunit.strip('[]').split(',')]
 				except AttributeError:
 					cunit = corpusunits[str(key)]
-				if verb: print "cunit: ", cunit
+				if verb: print ("cunit: ", cunit)
 				cunit[0] += self.cu_offset
-				if verb: print "cunit[0]: ", cunit[0]
+				if verb: print ("cunit[0]: ", cunit[0])
 				cunit[1] += current_procmap_offset
-				if verb: print "cunit[1]: ", cunit[1]
+				if verb: print ("cunit[1]: ", cunit[1])
 				cunit[2] += self.sf_offset
-				if verb: print "cunit[2]: ", cunit[2]
+				if verb: print ("cunit[2]: ", cunit[2])
 				self.add_corpus_unit(int(key) + self.cu_offset, cunit)
 		
 		self.sf_offset = max(self.sftree.nodes.keys()) + 1
-		if verb: print 'UPDATE max sfid --> sf_offset: ', self.sf_offset
+		if verb: print ('UPDATE max sfid --> sf_offset: ', self.sf_offset)
 		self.cu_offset = max(self.cutable.keys()) + 1
-		if verb: print 'UPDATE max cutable key --> cu_offset: ', self.cu_offset
+		if verb: print ('UPDATE max cutable key --> cu_offset: ', self.cu_offset)
 		self.sftree.procmap_offset = max(self.sftree.procmap.keys()) + 1
 
 		f.close()
@@ -655,9 +666,9 @@ class CorpusDB:
 			memmappath = None
 		f = open(jsonpath, 'w')
 		# don't forget the descriptors...
-		if verb: print ''
-		if verb: print self.sftree.procmap
-		if verb: print ''
+		if verb: print ('')
+		if verb: print (self.sftree.procmap)
+		if verb: print ('')
 		toplevel = { 'descriptors': self.feat.powers.indexes, 'anchorpath': self.anchor, 'procmap': self.sftree.procmap }
 		sf = dict()
 		for sfid in self.sftree.nodes.keys():
@@ -665,24 +676,24 @@ class CorpusDB:
 		toplevel['soundfiletree'] = sf
 		# roll the cutable rows into dictionary
 		d = dict()
-		if verb: print 'keys: ', self.cutable.keys()
+		if verb: print ('keys: ', self.cutable.keys())
 		
 		if memmappath is None:
 			for cid in sorted(list(self.cutable.keys())):
-				if verb: print 'cutable entry: ', type(self.cutable[cid])
+				if verb: print ('cutable entry: ', type(self.cutable[cid]))
 				d[str(cid)] = json.dumps(self.cutable[cid].tolist())
 			toplevel['corpusunits'] = d
 		else:
 			converted = self.convert_corpus_to_array('all')
-			if verb: print "converted shape: ", converted.shape
+			if verb: print ("converted shape: ", converted.shape)
 			fp = np.memmap(memmappath, dtype=np.float32, mode='w+', shape=converted.shape)
 			fp[:] = converted
 			fp.flush()
 			del fp
 			toplevel['corpusunits'] = [memmapfilename, converted.shape[0], converted.shape[1]]
-			if verb: print toplevel['corpusunits']
+			if verb: print (toplevel['corpusunits'])
 			
 
-		if verb: print toplevel.keys()
+		if verb: print (toplevel.keys())
 		f.write(jsonpickle.encode(toplevel))	
 		f.close()
